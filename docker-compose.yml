@@ -1,0 +1,37 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    restart: unless-stopped
+    ports:
+      - "6333:6333"  # HTTP / REST
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    healthcheck:
+      # The Qdrant image ships without curl/wget, so probe /readyz with bash's /dev/tcp.
+      test:
+        - CMD-SHELL
+        - >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 &&
+          printf "GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 &&
+          grep -q "200 OK" <&3'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Optional: run Ollama in Docker instead of on the host.
+  #   docker compose --profile ollama up -d ollama
+  #   docker compose exec ollama ollama pull qwen2.5:7b-instruct
+  # Default is a host install (better GPU support on Windows/macOS); see docs/adr/001-stack.md.
+  ollama:
+    image: ollama/ollama:0.40.8
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+volumes:
+  qdrant_storage:
+  ollama_models:
