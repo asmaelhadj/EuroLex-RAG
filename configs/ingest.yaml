@@ -1,0 +1,32 @@
+# Corpus and chunking settings for `make ingest`.
+# Expected counts are checked after parsing; a mismatch is an error, not a warning.
+
+raw_dir: data/raw
+processed_dir: data/processed
+
+acts:
+  - act_id: gdpr
+    celex: "32016R0679"
+    raw_filename: gdpr_en.html
+    expected_articles: 99
+    expected_recitals: 173
+  - act_id: ai_act
+    celex: "32024R1689"
+    raw_filename: ai_act_en.html
+    expected_articles: 113
+    expected_recitals: 180
+
+download:
+  # Publications Office CELLAR content negotiation (see docs/adr/002-corpus-source.md).
+  cellar_url_template: "http://publications.europa.eu/resource/celex/{celex}"
+  # Human-facing citation link stored on every chunk.
+  source_url_template: "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:{celex}"
+  timeout_seconds: 60
+
+chunking:
+  article:
+    # Articles above this size are split per paragraph, and paragraphs above it into parts.
+    max_tokens: 512
+  fixed:
+    size_tokens: 256
+    overlap_tokens: 32
