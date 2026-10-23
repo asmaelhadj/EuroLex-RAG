@@ -32,8 +32,8 @@ up: ## Start Qdrant (API and UI are added in Phase 7)
 down: ## Stop services
 	docker compose down
 
-ingest: ## Download/parse/chunk/embed/index the corpus
-	@echo "make ingest: not implemented yet (Phases 1-2)" && exit 1
+ingest: ## Download, parse and chunk the corpus (embedding and indexing come in Phase 2)
+	uv run python -m eurolex.ingestion --config configs/ingest.yaml
 
 eval: ## Run an experiment: make eval CONFIG=configs/e3_hybrid.yaml
 	@echo "make eval CONFIG=$(CONFIG): not implemented yet (Phase 4)" && exit 1

@@ -9,7 +9,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, ValidationError
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -50,6 +51,61 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # Off by default: raw questions may contain personal data (SPEC.md section 9).
     log_queries: bool = False
+
+
+class _YamlModel(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ActSpec(_YamlModel):
+    act_id: str = Field(pattern=r"^[a-z_]+$")
+    celex: str = Field(pattern=r"^\d{5}[A-Z]\d{4}$")
+    raw_filename: str
+    expected_articles: int = Field(gt=0)
+    expected_recitals: int = Field(gt=0)
+
+
+class DownloadConfig(_YamlModel):
+    cellar_url_template: str
+    source_url_template: str
+    timeout_seconds: float = Field(gt=0)
+
+    def source_url(self, celex: str) -> str:
+        return self.source_url_template.format(celex=celex)
+
+
+class ArticleChunkerConfig(_YamlModel):
+    max_tokens: int = Field(gt=0)
+
+
+class FixedChunkerConfig(_YamlModel):
+    size_tokens: int = Field(gt=0)
+    overlap_tokens: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _overlap_smaller_than_size(self) -> "FixedChunkerConfig":
+        if self.overlap_tokens >= self.size_tokens:
+            raise ValueError("overlap_tokens must be smaller than size_tokens")
+        return self
+
+
+class ChunkingConfig(_YamlModel):
+    article: ArticleChunkerConfig
+    fixed: FixedChunkerConfig
+
+
+class IngestConfig(_YamlModel):
+    raw_dir: Path
+    processed_dir: Path
+    acts: list[ActSpec] = Field(min_length=1)
+    download: DownloadConfig
+    chunking: ChunkingConfig
+
+
+def load_ingest_config(path: Path) -> IngestConfig:
+    """Load and validate `configs/ingest.yaml` (or another file with the same shape)."""
+    with path.open(encoding="utf-8") as fh:
+        return IngestConfig.model_validate(yaml.safe_load(fh))
 
 
 @lru_cache(maxsize=1)
