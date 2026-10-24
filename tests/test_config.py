@@ -17,9 +17,15 @@ def _isolated_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[N
     get_settings.cache_clear()
 
 
-def test_missing_api_key_fails_fast() -> None:
-    with pytest.raises(ConfigError, match="API_KEY"):
-        get_settings()
+def test_settings_load_without_api_key() -> None:
+    """Ingestion and evaluation must run without an API key."""
+    assert get_settings().api_key is None
+
+
+def test_api_requires_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("API_KEY", "")  # as copied from .env.example
+    with pytest.raises(ConfigError, match="API_KEY is not set"):
+        get_settings().require_api_key()
 
 
 def test_short_api_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -36,8 +42,9 @@ def test_defaults_and_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.log_queries is False
     assert settings.max_question_chars == 500
     assert "x" * 32 not in repr(settings)  # secret is masked
+    assert settings.require_api_key().get_secret_value() == "x" * 32
 
 
 def test_reads_dotenv_file() -> None:
     Path(".env").write_text("API_KEY=" + "y" * 20 + "\n", encoding="utf-8")
-    assert Settings().api_key.get_secret_value() == "y" * 20
+    assert Settings().require_api_key().get_secret_value() == "y" * 20

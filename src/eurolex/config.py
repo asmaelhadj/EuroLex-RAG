@@ -10,7 +10,15 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,8 +34,9 @@ class Settings(BaseSettings):
         frozen=True,
     )
 
-    # Required: the API must never start with an empty or trivially guessable key.
-    api_key: SecretStr = Field(min_length=16)
+    # Only the API needs a key, so ingestion and evaluation run without one; the API calls
+    # `require_api_key()` at startup so it can never run with an empty or guessable key.
+    api_key: SecretStr | None = Field(default=None, min_length=16)
 
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: SecretStr | None = None
@@ -39,9 +48,6 @@ class Settings(BaseSettings):
     judge_model: str | None = None
     candidate_model: str | None = None
 
-    embedding_model: str = "BAAI/bge-m3"
-    reranker_model: str = "BAAI/bge-reranker-v2-m3"
-
     data_dir: Path = Path("data")
     runs_dir: Path = Path("runs")
 
@@ -52,15 +58,28 @@ class Settings(BaseSettings):
     # Off by default: raw questions may contain personal data (SPEC.md section 9).
     log_queries: bool = False
 
+    @field_validator("api_key", "qdrant_api_key", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        """`.env.example` ships `API_KEY=`; treat an empty value as not set, not as invalid."""
+        return None if value == "" else value
+
+    def require_api_key(self) -> SecretStr:
+        if self.api_key is None:
+            raise ConfigError("API_KEY is not set. Copy .env.example to .env and fill it in.")
+        return self.api_key
+
 
 class _YamlModel(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", protected_namespaces=())
 
 
 class ActSpec(_YamlModel):
     act_id: str = Field(pattern=r"^[a-z_]+$")
     celex: str = Field(pattern=r"^\d{5}[A-Z]\d{4}$")
     raw_filename: str
+    # Display name used in embedding headers, e.g. "GDPR Article 6 - Lawfulness of processing".
+    short_name: str
     expected_articles: int = Field(gt=0)
     expected_recitals: int = Field(gt=0)
     # Disabled acts stay in the config so extending the corpus is a one-line change.
@@ -96,12 +115,39 @@ class ChunkingConfig(_YamlModel):
     fixed: FixedChunkerConfig
 
 
+class EmbeddingConfig(_YamlModel):
+    model: str
+    # Pinned Hugging Face commit so a re-run months later embeds with the same weights.
+    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    max_length: int = Field(gt=0)
+    batch_size: int = Field(gt=0)
+    device: Literal["auto", "cpu", "cuda"] = "auto"
+
+    @property
+    def model_id(self) -> str:
+        return f"{self.model}@{self.revision[:12]}"
+
+
+class CollectionConfig(_YamlModel):
+    name: str = Field(pattern=r"^[a-z0-9_-]+$")
+    chunker: Literal["article", "fixed"]
+    # Prefix chunk text with "GDPR Article 6(1) - <title>" before embedding.
+    prepend_header: bool
+
+
+class IndexConfig(_YamlModel):
+    collections: list[CollectionConfig] = Field(min_length=1)
+    upsert_batch_size: int = Field(gt=0)
+
+
 class IngestConfig(_YamlModel):
     raw_dir: Path
     processed_dir: Path
     acts: list[ActSpec] = Field(min_length=1)
     download: DownloadConfig
     chunking: ChunkingConfig
+    embedding: EmbeddingConfig
+    index: IndexConfig
 
     @model_validator(mode="after")
     def _at_least_one_enabled(self) -> "IngestConfig":

@@ -8,11 +8,13 @@ acts:
   - act_id: gdpr
     celex: "32016R0679"
     raw_filename: gdpr_en.html
+    short_name: GDPR
     expected_articles: 99
     expected_recitals: 173
   - act_id: ai_act
     celex: "32024R1689"
     raw_filename: ai_act_en.html
+    short_name: AI Act
     expected_articles: 113
     expected_recitals: 180
     # GDPR-only scope for now (docs/adr/004-gdpr-only-scope.md).
@@ -32,3 +34,23 @@ chunking:
   fixed:
     size_tokens: 256
     overlap_tokens: 32
+
+embedding:
+  model: BAAI/bge-m3
+  revision: 5617a9f61b028005a4858fdac845db406aefb181
+  # Longest article-aware chunk is 512 words (~700 subword tokens); longer input is truncated
+  # and reported by the indexer.
+  max_length: 1024
+  batch_size: 8
+  device: auto  # cuda if available, else cpu
+
+index:
+  upsert_batch_size: 64
+  collections:
+    - name: eurolex_article
+      chunker: article
+      prepend_header: true
+    - name: eurolex_fixed
+      chunker: fixed
+      # The naive baseline gets no structural hints.
+      prepend_header: false
