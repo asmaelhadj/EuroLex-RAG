@@ -1,0 +1,19 @@
+name: e5_rewrite
+description: E4 + LLM query rewriting (original question + rewrite)
+retrieval:
+  collection: eurolex_article
+  chunker: article
+  retrievers:
+    - type: dense
+      top_k: 50
+    - type: sparse
+      top_k: 50
+  fusion:
+    k: 60
+  rerank:
+    enabled: true
+    candidates: 50
+  rewrite:
+    enabled: true
+    mode: expand  # model defaults to LLM_MODEL
+  top_k: 10

@@ -59,7 +59,7 @@ packages = ["eurolex"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["FlagEmbedding", "FlagEmbedding.*"]
+module = ["FlagEmbedding", "FlagEmbedding.*", "rank_bm25"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

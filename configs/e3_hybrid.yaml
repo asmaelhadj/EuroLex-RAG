@@ -1,0 +1,13 @@
+name: e3_hybrid
+description: Dense + sparse hybrid with reciprocal rank fusion
+retrieval:
+  collection: eurolex_article
+  chunker: article
+  retrievers:
+    - type: dense
+      top_k: 50
+    - type: sparse
+      top_k: 50
+  fusion:
+    k: 60
+  top_k: 10

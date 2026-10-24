@@ -1,0 +1,16 @@
+name: e4_rerank
+description: E3 + bge-reranker-v2-m3 over the fused top 50
+retrieval:
+  collection: eurolex_article
+  chunker: article
+  retrievers:
+    - type: dense
+      top_k: 50
+    - type: sparse
+      top_k: 50
+  fusion:
+    k: 60
+  rerank:
+    enabled: true
+    candidates: 50
+  top_k: 10

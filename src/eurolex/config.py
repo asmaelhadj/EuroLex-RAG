@@ -166,6 +166,60 @@ def load_ingest_config(path: Path) -> IngestConfig:
         return IngestConfig.model_validate(yaml.safe_load(fh))
 
 
+class RetrieverSpec(_YamlModel):
+    type: Literal["dense", "sparse", "bm25"]
+    top_k: int = Field(default=50, gt=0)
+    weight: float = Field(default=1.0, gt=0)
+
+
+class FusionConfig(_YamlModel):
+    k: int = Field(default=60, gt=0)
+
+
+class RerankConfig(_YamlModel):
+    enabled: bool = False
+    model: str = "BAAI/bge-reranker-v2-m3"
+    revision: str = Field(
+        default="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e", pattern=r"^[0-9a-f]{40}$"
+    )
+    # how many fused candidates go to the reranker
+    candidates: int = Field(default=50, gt=0)
+    max_length: int = Field(default=1024, gt=0)
+    batch_size: int = Field(default=16, gt=0)
+    prepend_header: bool = True
+
+
+class RewriteConfig(_YamlModel):
+    enabled: bool = False
+    # None means LLM_MODEL from the environment
+    model: str | None = None
+    mode: Literal["replace", "expand"] = "expand"
+
+
+class RetrievalConfig(_YamlModel):
+    collection: str
+    # which chunks_<chunker>.jsonl BM25 reads
+    chunker: Literal["article", "fixed"]
+    retrievers: list[RetrieverSpec] = Field(min_length=1)
+    fusion: FusionConfig = FusionConfig()
+    rerank: RerankConfig = RerankConfig()
+    rewrite: RewriteConfig = RewriteConfig()
+    # results returned to evaluation
+    top_k: int = Field(default=10, gt=0)
+
+
+class ExperimentConfig(_YamlModel):
+    name: str = Field(pattern=r"^[a-z0-9_]+$")
+    description: str
+    ingest_config: Path = Path("configs/ingest.yaml")
+    retrieval: RetrievalConfig
+
+
+def load_experiment_config(path: Path) -> ExperimentConfig:
+    with path.open(encoding="utf-8") as fh:
+        return ExperimentConfig.model_validate(yaml.safe_load(fh))
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return the process-wide settings, failing fast with a readable message."""

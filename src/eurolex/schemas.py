@@ -102,3 +102,17 @@ class Chunk(_Frozen):
         if self.article_number is None:
             return None
         return article_id(self.act_id, self.article_number)
+
+
+class ScoredChunk(_Frozen):
+    chunk: Chunk
+    score: float
+
+
+class RetrievalResult(_Frozen):
+    query: str
+    # Set when query rewriting is on.
+    rewritten_query: str | None = None
+    hits: list[ScoredChunk]
+    # Stage name -> milliseconds, e.g. {"dense": 41.2, "fusion": 0.1}.
+    latency_ms: dict[str, float]

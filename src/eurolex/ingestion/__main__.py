@@ -9,18 +9,14 @@ from pathlib import Path
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
 
-from eurolex.config import ConfigError, IngestConfig, get_settings, load_ingest_config
+from eurolex.config import ConfigError, IngestConfig, load_ingest_config
 from eurolex.embeddings import BGEM3Embedder, Embedder
 from eurolex.ingestion.chunk import ArticleChunker, Chunker, FixedSizeChunker
 from eurolex.ingestion.download import DownloadError, download_acts
 from eurolex.ingestion.index import (
-    DENSE,
-    SPARSE,
     CollectionMismatchError,
     IndexReport,
-    SearchHit,
     ensure_collection,
-    search,
     sync_collection,
 )
 from eurolex.ingestion.parse import (
@@ -30,6 +26,7 @@ from eurolex.ingestion.parse import (
     parse_articles,
     parse_recitals,
 )
+from eurolex.retrieval.pipeline import default_qdrant_client
 from eurolex.schemas import Article, Chunk, Recital
 
 logger = logging.getLogger("eurolex.ingestion")
@@ -124,49 +121,20 @@ def index_corpus(
     return reports
 
 
-def _qdrant_client() -> QdrantClient:
-    settings = get_settings()
-    key = settings.qdrant_api_key.get_secret_value() if settings.qdrant_api_key else None
-    return QdrantClient(url=settings.qdrant_url, api_key=key)
-
-
-def _print_hits(query: str, collection: str, using: str, hits: list[SearchHit]) -> None:
-    print(f"\nQuery: {query}\nCollection: {collection} ({using})")
-    for rank, hit in enumerate(hits, start=1):
-        snippet = hit.chunk.text.replace("\n", " ")[:160]
-        print(f"{rank}. {hit.score:.4f}  {hit.chunk.chunk_id:<24} {snippet}")
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m eurolex.ingestion", description=__doc__)
     parser.add_argument("--config", type=Path, default=Path("configs/ingest.yaml"))
     parser.add_argument("--force-download", action="store_true", help="re-download raw files")
     parser.add_argument("--skip-index", action="store_true", help="stop after chunking")
     parser.add_argument("--recreate", action="store_true", help="drop and rebuild collections")
-    parser.add_argument("--query", help="only run a smoke-test search against the index")
-    parser.add_argument("--collection", default="eurolex_article")
-    parser.add_argument("--using", choices=[DENSE, SPARSE], default=DENSE)
-    parser.add_argument("--top-k", type=int, default=5)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
         config = load_ingest_config(args.config)
-        if args.query:
-            embedder = BGEM3Embedder(config.embedding)
-            hits = search(
-                _qdrant_client(),
-                args.collection,
-                embedder,
-                args.query,
-                using=args.using,
-                limit=args.top_k,
-            )
-            _print_hits(args.query, args.collection, args.using, hits)
-            return 0
         corpus = build_corpus(config, force_download=args.force_download)
         if not args.skip_index:
-            client = _qdrant_client()
+            client = default_qdrant_client()
             index_corpus(
                 config, corpus, BGEM3Embedder(config.embedding), client, recreate=args.recreate
             )

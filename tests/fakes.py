@@ -14,7 +14,7 @@ def _hash(word: str) -> int:
 class FakeEmbedder:
     """Bag-of-words embedder: texts sharing words get similar dense and sparse vectors."""
 
-    def __init__(self, dim: int = 16, model_id: str = "fake@000000000000", max_length: int = 64):
+    def __init__(self, dim: int = 256, model_id: str = "fake@000000000000", max_length: int = 64):
         self.dense_dim = dim
         self.model_id = model_id
         self.max_length = max_length

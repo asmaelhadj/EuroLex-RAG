@@ -179,30 +179,3 @@ def sync_collection(
     )
     logger.info("%s", report)
     return report
-
-
-@dataclass(frozen=True)
-class SearchHit:
-    score: float
-    chunk: Chunk
-
-
-def search(
-    client: QdrantClient, name: str, embedder: Embedder, query: str, *, using: str, limit: int
-) -> list[SearchHit]:
-    """Minimal single-vector search for smoke tests; the real retrievers arrive in Phase 3."""
-    (vec,) = embedder.embed([query])
-    q: list[float] | models.SparseVector = (
-        vec.dense
-        if using == DENSE
-        else models.SparseVector(indices=vec.sparse.indices, values=vec.sparse.values)
-    )
-    points = client.query_points(name, query=q, using=using, limit=limit, with_payload=True).points
-    fields = set(Chunk.model_fields)
-    return [
-        SearchHit(
-            score=p.score,
-            chunk=Chunk.model_validate({k: v for k, v in (p.payload or {}).items() if k in fields}),
-        )
-        for p in points
-    ]
