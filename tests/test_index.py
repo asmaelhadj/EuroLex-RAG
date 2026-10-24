@@ -6,14 +6,14 @@ from qdrant_client import QdrantClient
 from eurolex.embeddings import to_sparse
 from eurolex.ingestion.index import (
     DENSE,
-    SPARSE,
     CollectionMismatchError,
     embedding_text,
     ensure_collection,
     point_id,
-    search,
     sync_collection,
 )
+from eurolex.retrieval.dense import DenseRetriever
+from eurolex.retrieval.sparse import SparseRetriever
 from eurolex.schemas import Chunk
 from tests.fakes import FakeEmbedder
 
@@ -119,12 +119,15 @@ def test_truncation_is_counted(client: QdrantClient) -> None:
 def test_payload_and_search(client: QdrantClient) -> None:
     embedder = FakeEmbedder()
     sync(client, CHUNKS, embedder)
-    for using in (DENSE, SPARSE):
-        hits = search(
-            client, "c", embedder, "personal data means any information", using=using, limit=3
-        )
+    query = "personal data means any information"
+    for retriever in (
+        DenseRetriever(client, "c", embedder),
+        SparseRetriever(client, "c", embedder),
+    ):
+        hits = retriever.retrieve(query, 3)
         assert hits[0].chunk.chunk_id == "gdpr:art-4"
         assert hits[0].chunk == CHUNKS[1]
+        assert retriever.retrieve(query, 3, act_id="other_act") == []
     record = client.retrieve("c", [point_id("gdpr:art-4")], with_payload=True)[0]
     assert record.payload is not None
     assert record.payload["article_id"] == "gdpr:art-4"

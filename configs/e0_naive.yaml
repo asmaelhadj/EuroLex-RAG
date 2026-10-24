@@ -1,0 +1,8 @@
+name: e0_naive
+description: Fixed-size chunks + dense (naive baseline)
+retrieval:
+  collection: eurolex_fixed
+  chunker: fixed
+  retrievers:
+    - type: dense
+  top_k: 10

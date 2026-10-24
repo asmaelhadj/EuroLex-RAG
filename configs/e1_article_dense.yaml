@@ -1,0 +1,8 @@
+name: e1_article_dense
+description: Article-aware chunks + dense
+retrieval:
+  collection: eurolex_article
+  chunker: article
+  retrievers:
+    - type: dense
+  top_k: 10

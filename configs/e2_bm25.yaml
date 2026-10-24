@@ -1,0 +1,8 @@
+name: e2_bm25
+description: BM25 only (lexical baseline, article-aware chunks)
+retrieval:
+  collection: eurolex_article  # not used by BM25
+  chunker: article
+  retrievers:
+    - type: bm25
+  top_k: 10
