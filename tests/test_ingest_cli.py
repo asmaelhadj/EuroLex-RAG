@@ -5,10 +5,12 @@ from pathlib import Path
 import pytest
 import yaml
 from pydantic import ValidationError
+from qdrant_client import QdrantClient
 
 from eurolex.config import IngestConfig, load_ingest_config
-from eurolex.ingestion.__main__ import main
+from eurolex.ingestion.__main__ import build_corpus, index_corpus, main
 from eurolex.schemas import Chunk
+from tests.fakes import FakeEmbedder
 
 ROOT = Path(__file__).parents[1]
 FIXTURE = Path(__file__).parent / "fixtures" / "gdpr_sample.html"
@@ -44,7 +46,9 @@ def test_end_to_end_on_fixture(tmp_path: Path) -> None:
     # A file already in raw_dir is used as-is, so this runs offline (the manual path).
     (tmp_path / "raw").mkdir()
     shutil.copy(FIXTURE, tmp_path / "raw" / "gdpr_en.html")
-    assert main(["--config", str(_write_config(tmp_path, expected_articles=3))]) == 0
+    assert (
+        main(["--config", str(_write_config(tmp_path, expected_articles=3)), "--skip-index"]) == 0
+    )
 
     out = tmp_path / "processed"
     assert len((out / "articles.jsonl").read_text(encoding="utf-8").splitlines()) == 3
@@ -58,4 +62,22 @@ def test_end_to_end_on_fixture(tmp_path: Path) -> None:
 def test_count_mismatch_fails(tmp_path: Path) -> None:
     (tmp_path / "raw").mkdir()
     shutil.copy(FIXTURE, tmp_path / "raw" / "gdpr_en.html")
-    assert main(["--config", str(_write_config(tmp_path, expected_articles=99))]) == 1
+    assert (
+        main(["--config", str(_write_config(tmp_path, expected_articles=99)), "--skip-index"]) == 1
+    )
+
+
+def test_index_corpus_on_fixture(tmp_path: Path) -> None:
+    (tmp_path / "raw").mkdir()
+    shutil.copy(FIXTURE, tmp_path / "raw" / "gdpr_en.html")
+    config = load_ingest_config(_write_config(tmp_path, expected_articles=3))
+    corpus = build_corpus(config, force_download=False)
+    client = QdrantClient(":memory:")
+    reports = index_corpus(config, corpus, FakeEmbedder(max_length=10_000), client, recreate=False)
+    assert {r.collection: r.points for r in reports} == {
+        "eurolex_article": len(corpus["article"]),
+        "eurolex_fixed": len(corpus["fixed"]),
+    }
+    again = index_corpus(config, corpus, FakeEmbedder(max_length=10_000), client, recreate=False)
+    assert [r.embedded for r in again] == [0, 0]
+    assert [r.points for r in again] == [r.points for r in reports]

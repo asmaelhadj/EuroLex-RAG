@@ -11,6 +11,7 @@ ACT = ActSpec(
     act_id="gdpr",
     celex="32016R0679",
     raw_filename="gdpr_en.html",
+    short_name="GDPR",
     expected_articles=99,
     expected_recitals=173,
 )
