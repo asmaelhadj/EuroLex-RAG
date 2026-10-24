@@ -63,6 +63,8 @@ class ActSpec(_YamlModel):
     raw_filename: str
     expected_articles: int = Field(gt=0)
     expected_recitals: int = Field(gt=0)
+    # Disabled acts stay in the config so extending the corpus is a one-line change.
+    enabled: bool = True
 
 
 class DownloadConfig(_YamlModel):
@@ -100,6 +102,16 @@ class IngestConfig(_YamlModel):
     acts: list[ActSpec] = Field(min_length=1)
     download: DownloadConfig
     chunking: ChunkingConfig
+
+    @model_validator(mode="after")
+    def _at_least_one_enabled(self) -> "IngestConfig":
+        if not self.enabled_acts:
+            raise ValueError("at least one act must be enabled")
+        return self
+
+    @property
+    def enabled_acts(self) -> list[ActSpec]:
+        return [act for act in self.acts if act.enabled]
 
 
 def load_ingest_config(path: Path) -> IngestConfig:

@@ -39,5 +39,5 @@ The `source_url` on every chunk still points to the human-readable EUR-Lex page.
   The GDPR has not been amended; any later corrigenda are not merged in.
 - The AI Act's **annexes** (13, including Annex III's list of high-risk uses) are in the file but
   are not parsed yet: SPEC.md only defines article and recital chunks. Questions whose answer
-  is in an annex will have no gold article. This needs a decision before the question set is
-  built.
+  is in an annex will have no gold article. Deferred: the AI Act is disabled for now
+  (ADR 004), so this is decided when it is re-enabled.
