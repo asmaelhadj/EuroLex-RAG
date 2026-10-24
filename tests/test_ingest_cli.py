@@ -2,9 +2,11 @@ import json
 import shutil
 from pathlib import Path
 
+import pytest
 import yaml
+from pydantic import ValidationError
 
-from eurolex.config import load_ingest_config
+from eurolex.config import IngestConfig, load_ingest_config
 from eurolex.ingestion.__main__ import main
 from eurolex.schemas import Chunk
 
@@ -15,7 +17,15 @@ FIXTURE = Path(__file__).parent / "fixtures" / "gdpr_sample.html"
 def test_repo_config_is_valid() -> None:
     config = load_ingest_config(ROOT / "configs" / "ingest.yaml")
     assert [a.act_id for a in config.acts] == ["gdpr", "ai_act"]
+    assert [a.act_id for a in config.enabled_acts] == ["gdpr"]
     assert config.acts[0].expected_articles == 99
+
+
+def test_config_needs_an_enabled_act() -> None:
+    data = yaml.safe_load((ROOT / "configs" / "ingest.yaml").read_text(encoding="utf-8"))
+    data["acts"] = [{**act, "enabled": False} for act in data["acts"]]
+    with pytest.raises(ValidationError, match="at least one act must be enabled"):
+        IngestConfig.model_validate(data)
 
 
 def _write_config(tmp_path: Path, expected_articles: int) -> Path:

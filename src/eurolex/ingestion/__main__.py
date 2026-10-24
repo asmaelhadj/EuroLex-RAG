@@ -36,7 +36,7 @@ def write_jsonl(path: Path, rows: Iterable[BaseModel]) -> int:
 def parse_corpus(config: IngestConfig) -> tuple[list[Article], list[Recital]]:
     articles: list[Article] = []
     recitals: list[Recital] = []
-    for act in config.acts:
+    for act in config.enabled_acts:
         path = config.raw_dir / act.raw_filename
         if not path.exists():
             raise ParseError(f"{path} is missing; run the download step or place it manually")
@@ -68,7 +68,7 @@ def build_chunkers(config: IngestConfig) -> list[Chunker]:
 
 
 def run(config: IngestConfig, *, force_download: bool) -> None:
-    download_acts(config.acts, config.raw_dir, config.download, force=force_download)
+    download_acts(config.enabled_acts, config.raw_dir, config.download, force=force_download)
     articles, recitals = parse_corpus(config)
     out = config.processed_dir
     write_jsonl(out / "articles.jsonl", articles)

@@ -15,6 +15,8 @@ acts:
     raw_filename: ai_act_en.html
     expected_articles: 113
     expected_recitals: 180
+    # GDPR-only scope for now (docs/adr/004-gdpr-only-scope.md).
+    enabled: false
 
 download:
   # Publications Office CELLAR content negotiation (see docs/adr/002-corpus-source.md).
