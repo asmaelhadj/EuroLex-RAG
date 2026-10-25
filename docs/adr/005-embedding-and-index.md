@@ -25,13 +25,21 @@ otherwise initialises the sparse head at random with only a log message.
 
 ColBERT multi-vectors are not used. SPEC.md's hybrid search is dense + sparse.
 
-## PyTorch: CPU wheels by default
+## PyTorch: CUDA on Windows, CPU on Linux
 
-`pyproject.toml` takes `torch` from the PyTorch CPU index (PyPI on macOS). This keeps installs
-small (the CUDA wheels are several GB), and CI and laptops get the same numerics. The corpus is
-a few hundred chunks, so CPU indexing takes minutes. To use a GPU, point `torch` at a CUDA index
-and set `embedding.device: cuda` (`auto` already picks CUDA when it is available, and enables
-fp16 there).
+`pyproject.toml` takes `torch` from the CUDA 12.6 index on Windows, the CPU index on Linux and
+PyPI on macOS.
+
+- First we used CPU wheels everywhere. On the dev laptop (i5-11400H) that meant ~2 s per
+  model forward pass: 17 min to index the GDPR and ~2 min per query to rerank 50 candidates,
+  which is too slow for evaluation runs and a demo (2026-10-24).
+- The dev machine has a GTX 1650 (4 GB, compute capability 7.5). cu126 supports it; the wheel
+  is 2.6 GB.
+- CI runs on Linux with the CPU wheel. Its tests use fake models, so they stay fast.
+- `embedding.device: auto` picks CUDA when available and then runs in **fp16**. fp16 vectors
+  differ slightly from fp32 ones, so the precision is part of `embedding_model` in the payload
+  (e.g. `BAAI/bge-m3@5617a9f61b02+fp16`). Switching device therefore re-embeds the
+  collection on the next `make ingest`.
 
 ## Index layout
 

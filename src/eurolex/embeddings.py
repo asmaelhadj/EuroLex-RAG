@@ -74,11 +74,12 @@ class BGEM3Embedder:
             config.model, revision=config.revision, allow_patterns=_BGE_M3_FILES
         )
         device = resolve_device(config.device)
-        self.model_id = config.model_id
+        fp16 = device != "cpu"
+        # fp16 vectors differ a bit from fp32 ones, so precision is part of the id
+        self.model_id = f"{config.model_id}+{'fp16' if fp16 else 'fp32'}"
         self.max_length = config.max_length
         self._batch_size = config.batch_size
-        # fp16 only on GPU; on CPU FlagEmbedding runs fp32 regardless.
-        self._model: Any = BGEM3FlagModel(path, use_fp16=device != "cpu", devices=device)
+        self._model: Any = BGEM3FlagModel(path, use_fp16=fp16, devices=device)
         self.dense_dim = int(self._model.model.model.config.hidden_size)
         logger.info("Loaded %s on %s", self.model_id, device)
 
