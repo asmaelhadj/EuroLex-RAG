@@ -96,9 +96,26 @@ def test_rewrite_modes() -> None:
     assert "delete my info?" in llm.prompts[0]
 
 
-def test_rewrite_falls_back_to_original() -> None:
-    assert QueryRewriter(FakeLLM(None)).rewrite("q?") == "q?"
-    assert QueryRewriter(FakeLLM("   \n  ")).rewrite("q?") == "q?"
+def test_rewrite_failure_returns_none() -> None:
+    assert QueryRewriter(FakeLLM(None)).rewrite("q?") is None
+    assert QueryRewriter(FakeLLM("   \n  ")).rewrite("q?") is None
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("mistral", True), ("mistral:latest", True), ("qwen2.5:7b-instruct", True), ("llama3", False)],
+)
+def test_has_model(name: str, expected: bool) -> None:
+    tags = {"models": [{"name": "mistral:latest"}, {"name": "qwen2.5:7b-instruct"}]}
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=tags))
+    client = OllamaClient("http://o.test", name, client=httpx.Client(transport=transport))
+    assert client.has_model() is expected
+
+
+def test_has_model_when_ollama_is_down() -> None:
+    transport = httpx.MockTransport(lambda request: httpx.Response(503))
+    client = OllamaClient("http://o.test", "mistral", client=httpx.Client(transport=transport))
+    assert not client.has_model()
 
 
 @pytest.mark.parametrize(

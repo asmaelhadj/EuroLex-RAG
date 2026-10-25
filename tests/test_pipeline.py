@@ -247,3 +247,44 @@ def test_bge_reranker_sorts_by_model_score() -> None:
     single = bge_reranker(0.7).rerank("q", hits[:1], top_n=5)
     assert [h.score for h in single] == [0.7]
     assert bge_reranker([]).rerank("q", [], top_n=5) == []
+
+
+def test_failed_rewrite_is_flagged_and_original_used(ingest: IngestConfig) -> None:
+    cfg = config("bm25", rewrite=RewriteConfig(enabled=True, mode="replace"))
+    result = build_pipeline(cfg, ingest, llm=FakeLLM(None)).run("hotel")
+    assert result.rewrite_failed is True
+    assert result.rewritten_query is None
+    assert ids(result.hits) == ["gdpr:art-4"]  # searched with the original question
+
+
+def test_runner_marks_failed_rewrites_not_reportable(ingest: IngestConfig) -> None:
+    from eurolex.config import ExperimentConfig
+    from eurolex.evaluation.runner import run_experiment
+    from eurolex.schemas import Question
+
+    cfg = config("bm25", rewrite=RewriteConfig(enabled=True))
+    pipeline = build_pipeline(cfg, ingest, llm=FakeLLM(None))
+    q = Question(
+        id="q-0001",
+        question="hotel?",
+        gold_article_ids=["gdpr:art-4"],
+        type="factual",
+        source="human",
+        status="validated",
+    )
+    experiment = ExperimentConfig(name="e5_rewrite", description="d", retrieval=cfg)
+    run = run_experiment(experiment, ingest, [q], "dev", pipeline)
+    assert run["reportable"] is False
+    assert "query rewriting failed for 1 questions" in run["not_reportable_because"]
+
+
+def test_missing_rewrite_model_fails_fast(
+    ingest: IngestConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from eurolex.config import ConfigError
+    from eurolex.generation.llm import OllamaClient
+
+    monkeypatch.setattr(OllamaClient, "has_model", lambda self: False)
+    cfg = config("bm25", rewrite=RewriteConfig(enabled=True, model="not-pulled"))
+    with pytest.raises(ConfigError, match="not-pulled is not installed"):
+        build_pipeline(cfg, ingest)

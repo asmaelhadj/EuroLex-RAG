@@ -39,10 +39,22 @@ class OllamaClient:
         client: httpx.Client | None = None,
     ) -> None:
         self.model = model
-        self._url = base_url.rstrip("/") + "/api/generate"
+        self._base = base_url.rstrip("/")
+        self._url = self._base + "/api/generate"
         self._retries = retries
         self._options = {"temperature": temperature, "seed": seed}
         self._http = client or httpx.Client(timeout=timeout_seconds)
+
+    def has_model(self) -> bool:
+        """True if Ollama is reachable and the model is pulled."""
+        try:
+            response = self._http.get(self._base + "/api/tags")
+            response.raise_for_status()
+            names = {m.get("name") for m in response.json().get("models", [])}
+        except (httpx.HTTPError, ValueError):
+            return False
+        # "mistral" and "mistral:latest" are the same model
+        return self.model in names or f"{self.model}:latest" in names
 
     def generate(
         self,

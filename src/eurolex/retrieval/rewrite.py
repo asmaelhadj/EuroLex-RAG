@@ -16,21 +16,21 @@ MAX_REWRITE_CHARS = 300
 
 
 class QueryRewriter:
-    """Asks the LLM for a search query. Falls back to the original question on any failure."""
+    """Asks the LLM for a search query. Returns None when it fails, so callers can count it."""
 
     def __init__(self, llm: LLMClient, mode: Literal["replace", "expand"] = "expand") -> None:
         self._llm = llm
         self._mode = mode
 
-    def rewrite(self, question: str) -> str:
+    def rewrite(self, question: str) -> str | None:
         try:
             raw = self._llm.generate(f"Question: {question}", system=SYSTEM_PROMPT)
         except LLMError:
-            logger.warning("query rewriting failed, using the original question")
-            return question
+            logger.warning("query rewriting failed")
+            return None
         rewritten = clean_rewrite(raw)
         if not rewritten:
-            return question
+            return None
         return rewritten if self._mode == "replace" else f"{question} {rewritten}"
 
 

@@ -9,6 +9,7 @@ from pathlib import Path
 from qdrant_client import QdrantClient
 
 from eurolex.config import (
+    ConfigError,
     IngestConfig,
     RetrievalConfig,
     RetrieverSpec,
@@ -86,10 +87,15 @@ class RetrievalPipeline:
         latency: dict[str, float] = {}
         query = question
         rewritten = None
+        rewrite_failed = False
         if self._rewriter is not None:
             start = time.perf_counter()
-            rewritten = query = self._rewriter.rewrite(question)
+            rewritten = self._rewriter.rewrite(question)
             latency["rewrite"] = _ms(start)
+            if rewritten is None:
+                rewrite_failed = True  # search with the original question
+            else:
+                query = rewritten
 
         if self._embedder is not None:
             # embed once up front so retriever timings are search time only
@@ -124,7 +130,11 @@ class RetrievalPipeline:
 
         latency["total"] = round(sum(latency.values()), 2)
         return RetrievalResult(
-            query=question, rewritten_query=rewritten, hits=hits, latency_ms=latency
+            query=question,
+            rewritten_query=rewritten,
+            rewrite_failed=rewrite_failed,
+            hits=hits,
+            latency_ms=latency,
         )
 
 
@@ -184,11 +194,18 @@ def build_pipeline(
     if config.rewrite.enabled:
         if llm is None:
             settings = get_settings()
-            llm = OllamaClient(
+            ollama = OllamaClient(
                 settings.ollama_base_url,
                 config.rewrite.model or settings.llm_model,
                 seed=settings.random_seed,
             )
+            # fail now rather than silently searching without rewrites
+            if not ollama.has_model():
+                raise ConfigError(
+                    f"Ollama model {ollama.model} is not installed (needed for query rewriting). "
+                    f"Run `ollama pull {ollama.model}` or set rewrite.model."
+                )
+            llm = ollama
         rewriter = QueryRewriter(llm, config.rewrite.mode)
 
     return RetrievalPipeline(
