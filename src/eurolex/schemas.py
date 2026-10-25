@@ -4,6 +4,7 @@ Every artefact written to disk (articles, recitals, chunks, questions) round-tri
 models, so a malformed row fails loudly at the boundary instead of silently skewing metrics.
 """
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -116,3 +117,45 @@ class RetrievalResult(_Frozen):
     hits: list[ScoredChunk]
     # Stage name -> milliseconds, e.g. {"dense": 41.2, "fusion": 0.1}.
     latency_ms: dict[str, float]
+
+
+QuestionType = Literal[
+    "factual", "definition", "obligation", "multi_article", "paraphrase", "out_of_scope"
+]
+QuestionSource = Literal["human", "llm_candidate", "faq"]
+QuestionStatus = Literal["pending", "validated", "rejected"]
+Split = Literal["dev", "test"]
+
+_ARTICLE_ID = r"^[a-z_]+:art-\d+[a-z]?$"
+
+
+class Question(BaseModel):
+    """One row of data/eval/questions.jsonl (SPEC.md section 5.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^q-\d{4,}$")
+    question: str = Field(min_length=3)
+    gold_article_ids: list[str]
+    type: QuestionType
+    source: QuestionSource
+    status: QuestionStatus = "pending"
+    split: Split = "dev"
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _check_gold(self) -> "Question":
+        for gold in self.gold_article_ids:
+            if not re.match(_ARTICLE_ID, gold):
+                raise ValueError(f"bad article id {gold!r}, expected e.g. gdpr:art-6")
+        if self.type == "out_of_scope" and self.gold_article_ids:
+            raise ValueError("out_of_scope questions have no gold articles")
+        if self.type != "out_of_scope" and not self.gold_article_ids:
+            raise ValueError("in-scope questions need at least one gold article")
+        if len(set(self.gold_article_ids)) != len(self.gold_article_ids):
+            raise ValueError("duplicate gold article ids")
+        return self
+
+    @property
+    def in_scope(self) -> bool:
+        return self.type != "out_of_scope"

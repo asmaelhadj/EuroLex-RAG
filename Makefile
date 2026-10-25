@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup check lint format typecheck test up down ingest eval report
+.PHONY: help setup check lint format typecheck test up down ingest eval report candidates review
 
 CONFIG ?= configs/e3_hybrid.yaml
+SPLIT ?= dev
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -35,8 +36,14 @@ down: ## Stop services
 ingest: ## Download, parse, chunk, embed and index the corpus (needs `make up`)
 	uv run python -m eurolex.ingestion --config configs/ingest.yaml
 
-eval: ## Run an experiment: make eval CONFIG=configs/e3_hybrid.yaml
-	@echo "make eval CONFIG=$(CONFIG): not implemented yet (Phase 4)" && exit 1
+eval: ## Run an experiment: make eval CONFIG=configs/e3_hybrid.yaml SPLIT=dev
+	uv run python -m eurolex.evaluation.runner --config $(CONFIG) --split $(SPLIT)
 
 report: ## Regenerate docs/results.md from saved runs
-	@echo "make report: not implemented yet (Phase 4)" && exit 1
+	uv run python -m eurolex.evaluation.report
+
+candidates: ## Generate pending LLM question candidates (MODEL=mistral:latest)
+	uv run python -m eurolex.evaluation.candidates $(if $(MODEL),--model $(MODEL))
+
+review: ## Review pending questions in the terminal
+	uv run python -m eurolex.evaluation.review_cli review

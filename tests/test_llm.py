@@ -27,6 +27,20 @@ def test_generate_sends_model_system_and_options() -> None:
     assert body["system"] == "be brief"
     assert body["stream"] is False
     assert body["options"] == {"temperature": 0.0, "seed": 42}
+    assert "format" not in body
+
+
+def test_generate_json_schema_and_temperature() -> None:
+    seen: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"response": "{}"})
+
+    schema: dict[str, object] = {"type": "object"}
+    ollama(httpx.MockTransport(handler)).generate("hi", json_schema=schema, temperature=0.7)
+    assert seen[0]["format"] == schema
+    assert seen[0]["options"] == {"temperature": 0.7, "seed": 42}
 
 
 def test_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -57,7 +71,14 @@ class FakeLLM:
         self.reply = reply
         self.prompts: list[str] = []
 
-    def generate(self, prompt: str, *, system: str | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        json_schema: dict[str, object] | None = None,
+        temperature: float | None = None,
+    ) -> str:
         self.prompts.append(prompt)
         if self.reply is None:
             raise LLMError("down")
