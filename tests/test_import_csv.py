@@ -16,6 +16,8 @@ KNOWN = {f"gdpr:art-{n}" for n in range(1, 100)}
         ("Article 77; EDPB institutional role", [77]),
         ("Articles 5(1)(f) and 32", [5, 32]),
         ("Articles 37-39", [37, 38, 39]),
+        ("Article 2(2)(c) and Recital 18", [2]),
+        ("Recitals 26 and 27", []),
         ("", []),
     ],
 )
