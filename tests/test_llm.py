@@ -43,6 +43,20 @@ def test_generate_json_schema_and_temperature() -> None:
     assert seen[0]["options"] == {"temperature": 0.7, "seed": 42}
 
 
+def test_num_gpu_option() -> None:
+    seen: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"response": "ok"})
+
+    transport = httpx.MockTransport(handler)
+    OllamaClient(
+        "http://o.test", "m", num_gpu=0, client=httpx.Client(transport=transport)
+    ).generate("hi")
+    assert seen[0]["options"] == {"temperature": 0.0, "seed": 42, "num_gpu": 0}
+
+
 def test_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("eurolex.generation.llm.time.sleep", lambda s: None)
     calls = iter([httpx.Response(500), httpx.Response(200, json={"response": "ok"})])

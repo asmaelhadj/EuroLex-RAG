@@ -198,6 +198,7 @@ def build_pipeline(
                 settings.ollama_base_url,
                 config.rewrite.model or settings.llm_model,
                 seed=settings.random_seed,
+                num_gpu=config.rewrite.gpu_layers,
             )
             # fail now rather than silently searching without rewrites
             if not ollama.has_model():

@@ -36,13 +36,16 @@ class OllamaClient:
         retries: int = 2,
         temperature: float = 0.0,
         seed: int = 42,
+        num_gpu: int | None = None,
         client: httpx.Client | None = None,
     ) -> None:
         self.model = model
         self._base = base_url.rstrip("/")
         self._url = self._base + "/api/generate"
         self._retries = retries
-        self._options = {"temperature": temperature, "seed": seed}
+        self._options: dict[str, float | int] = {"temperature": temperature, "seed": seed}
+        if num_gpu is not None:
+            self._options["num_gpu"] = num_gpu
         self._http = client or httpx.Client(timeout=timeout_seconds)
 
     def has_model(self) -> bool:

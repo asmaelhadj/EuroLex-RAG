@@ -199,6 +199,8 @@ class RewriteConfig(_YamlModel):
     # None means LLM_MODEL from the environment
     model: str | None = None
     mode: Literal["replace", "expand"] = "expand"
+    # Ollama num_gpu; 0 runs the model on CPU so a small GPU stays free for the reranker
+    gpu_layers: int | None = Field(default=None, ge=0)
 
 
 class RetrievalConfig(_YamlModel):
