@@ -141,3 +141,31 @@ def test_report_without_runs_is_all_todo(tmp_path: Path) -> None:
     assert "TODO: no reportable runs on the test split" in report
     assert "TODO: no reportable runs on the dev split" in report
     assert "0." not in report  # no numbers at all
+
+
+def test_git_info_ignores_saved_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess
+
+    from eurolex.evaluation.runner import git_info
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)  # noqa: S603, S607
+
+    git("init", "-q")
+    git(
+        "-c",
+        "user.email=t@example.test",
+        "-c",
+        "user.name=t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "x",
+    )
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "runs" / "r1").mkdir(parents=True)
+    (tmp_path / "runs" / "r1" / "summary.json").write_text("{}", encoding="utf-8")
+    assert git_info()["dirty"] is False
+    (tmp_path / "code.py").write_text("x = 1\n", encoding="utf-8")
+    assert git_info()["dirty"] is True
