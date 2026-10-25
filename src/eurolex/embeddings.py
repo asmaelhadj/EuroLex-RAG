@@ -66,20 +66,22 @@ def to_sparse(lexical_weights: dict[str, float]) -> SparseVector:
 
 
 class BGEM3Embedder:
-    def __init__(self, config: EmbeddingConfig) -> None:
+    def __init__(self, config: EmbeddingConfig, device: str | None = None) -> None:
         # Imported here: FlagEmbedding pulls in heavy modules that tests and CLI help don't need.
         from FlagEmbedding import BGEM3FlagModel
 
         path = snapshot_download(
             config.model, revision=config.revision, allow_patterns=_BGE_M3_FILES
         )
-        device = resolve_device(config.device)
-        fp16 = device != "cpu"
-        # fp16 vectors differ a bit from fp32 ones, so precision is part of the id
-        self.model_id = f"{config.model_id}+{'fp16' if fp16 else 'fp32'}"
+        device = resolve_device(device or config.device)
+        # FlagEmbedding always runs fp32 on CPU
+        if device == "cpu" and config.precision == "fp16":
+            raise ValueError("fp16 embeddings need a GPU; set embedding.precision: fp32")
+        # precision is part of the id, so fp16 and fp32 vectors are never mixed
+        self.model_id = config.model_id
         self.max_length = config.max_length
         self._batch_size = config.batch_size
-        self._model: Any = BGEM3FlagModel(path, use_fp16=fp16, devices=device)
+        self._model: Any = BGEM3FlagModel(path, use_fp16=config.precision == "fp16", devices=device)
         self.dense_dim = int(self._model.model.model.config.hidden_size)
         logger.info("Loaded %s on %s", self.model_id, device)
 

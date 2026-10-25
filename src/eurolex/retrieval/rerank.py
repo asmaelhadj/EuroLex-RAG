@@ -34,6 +34,7 @@ class BGEReranker:
         max_length: int,
         batch_size: int,
         device: str = "auto",
+        fp16: bool = False,
         passage_text: Callable[[Chunk], str] = lambda c: c.text,
     ) -> None:
         from FlagEmbedding import FlagReranker
@@ -41,7 +42,7 @@ class BGEReranker:
         path = snapshot_download(model, revision=revision, allow_patterns=_RERANKER_FILES)
         resolved = resolve_device(device)
         self._model: Any = FlagReranker(
-            path, use_fp16=resolved != "cpu", devices=resolved, max_length=max_length
+            path, use_fp16=fp16 and resolved != "cpu", devices=resolved, max_length=max_length
         )
         self._batch_size = batch_size
         self._max_length = max_length

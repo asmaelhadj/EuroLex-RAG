@@ -159,7 +159,7 @@ def build_pipeline(
                 if embedder is None:
                     from eurolex.embeddings import BGEM3Embedder
 
-                    embedder = BGEM3Embedder(ingest.embedding)
+                    embedder = BGEM3Embedder(ingest.embedding, device=config.query_device)
                 cached = CachingEmbedder(embedder)
             if client is None:
                 client = (qdrant_factory or default_qdrant_client)()
@@ -175,7 +175,8 @@ def build_pipeline(
             config.rerank.revision,
             max_length=config.rerank.max_length,
             batch_size=config.rerank.batch_size,
-            device=ingest.embedding.device,
+            device=config.rerank.device,
+            fp16=config.rerank.precision == "fp16",
             passage_text=lambda c: embedding_text(c, act_names, prepend_header=prepend),
         )
 

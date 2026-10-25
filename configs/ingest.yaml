@@ -43,6 +43,7 @@ embedding:
   max_length: 1024
   batch_size: 8
   device: auto  # cuda if available, else cpu
+  precision: fp32
 
 index:
   upsert_batch_size: 64

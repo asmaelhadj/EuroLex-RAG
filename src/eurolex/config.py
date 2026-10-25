@@ -121,11 +121,14 @@ class EmbeddingConfig(_YamlModel):
     revision: str = Field(pattern=r"^[0-9a-f]{40}$")
     max_length: int = Field(gt=0)
     batch_size: int = Field(gt=0)
+    # device used to build the index
     device: Literal["auto", "cpu", "cuda"] = "auto"
+    # fp16 only pays off on GPUs with tensor cores; on a GTX 1650 it is 4x slower
+    precision: Literal["fp32", "fp16"] = "fp32"
 
     @property
     def model_id(self) -> str:
-        return f"{self.model}@{self.revision[:12]}"
+        return f"{self.model}@{self.revision[:12]}+{self.precision}"
 
 
 class CollectionConfig(_YamlModel):
@@ -185,8 +188,10 @@ class RerankConfig(_YamlModel):
     # how many fused candidates go to the reranker
     candidates: int = Field(default=50, gt=0)
     max_length: int = Field(default=1024, gt=0)
-    batch_size: int = Field(default=16, gt=0)
+    batch_size: int = Field(default=8, gt=0)
     prepend_header: bool = True
+    device: Literal["auto", "cpu", "cuda"] = "auto"
+    precision: Literal["fp32", "fp16"] = "fp32"
 
 
 class RewriteConfig(_YamlModel):
@@ -206,6 +211,8 @@ class RetrievalConfig(_YamlModel):
     rewrite: RewriteConfig = RewriteConfig()
     # results returned to evaluation
     top_k: int = Field(default=10, gt=0)
+    # CPU by default so a small GPU is left for the reranker
+    query_device: Literal["auto", "cpu", "cuda"] = "cpu"
 
 
 class ExperimentConfig(_YamlModel):
