@@ -16,7 +16,14 @@ class LLMError(RuntimeError):
 class LLMClient(Protocol):
     model: str
 
-    def generate(self, prompt: str, *, system: str | None = None) -> str: ...
+    def generate(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        json_schema: dict[str, object] | None = None,
+        temperature: float | None = None,
+    ) -> str: ...
 
 
 class OllamaClient:
@@ -37,15 +44,28 @@ class OllamaClient:
         self._options = {"temperature": temperature, "seed": seed}
         self._http = client or httpx.Client(timeout=timeout_seconds)
 
-    def generate(self, prompt: str, *, system: str | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        json_schema: dict[str, object] | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        options = dict(self._options)
+        if temperature is not None:
+            options["temperature"] = temperature
         body: dict[str, object] = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "options": self._options,
+            "options": options,
         }
         if system:
             body["system"] = system
+        if json_schema:
+            # Ollama structured output: the reply is JSON matching this schema
+            body["format"] = json_schema
         last_error: Exception | None = None
         for attempt in range(self._retries + 1):
             try:
