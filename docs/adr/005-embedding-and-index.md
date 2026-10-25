@@ -36,10 +36,27 @@ PyPI on macOS.
 - The dev machine has a GTX 1650 (4 GB, compute capability 7.5). cu126 supports it; the wheel
   is 2.6 GB.
 - CI runs on Linux with the CPU wheel. Its tests use fake models, so they stay fast.
-- `embedding.device: auto` picks CUDA when available and then runs in **fp16**. fp16 vectors
-  differ slightly from fp32 ones, so the precision is part of `embedding_model` in the payload
-  (e.g. `BAAI/bge-m3@5617a9f61b02+fp16`). Switching device therefore re-embeds the
-  collection on the next `make ingest`.
+
+## Precision: fp32 by default
+
+We first ran fp16 on the GPU, assuming it would be faster. On the GTX 1650 it is not: the card
+has no tensor cores, and a matmul benchmark gave **0.33 TFLOPS in fp16 vs 1.36 TFLOPS in
+fp32** (plugged in, GPU at full clock). Being on battery made both slower still.
+
+| Building the GDPR index (634 chunks) | Time |
+|---|---|
+| CPU, fp32 | 17.5 min |
+| GPU, fp16 (with another job using most of the RAM) | 521 s |
+| GPU, fp32 | **140 s** |
+
+So `embedding.precision` defaults to `fp32`; `fp16` is an option for GPUs with tensor cores.
+The precision is part of `embedding_model` in the payload (e.g.
+`BAAI/bge-m3@5617a9f61b02+fp32`), so changing it re-embeds the collection on the next
+`make ingest` and fp16 and fp32 vectors are never mixed.
+
+The index is built on `embedding.device` (`auto`: the GPU here). Queries are embedded on the
+CPU by default (`retrieval.query_device: cpu`): one short query takes ~0.2 s there, and the
+4 GB GPU cannot hold BGE-M3 and the reranker together in fp32 (~2.2 GB each).
 
 ## Index layout
 
