@@ -122,3 +122,23 @@ def test_append_candidates_is_pending_and_deduplicated(tmp_path: Path) -> None:
     again = append_candidates(drafts, path)
     assert again == []
     assert len(load_questions(path)) == 2
+
+
+def test_covered_articles_ignores_rejected() -> None:
+    from eurolex.evaluation.candidates import covered_articles
+    from eurolex.schemas import Question
+
+    def q(qid: str, gold: list[str], status: str) -> Question:
+        return Question.model_validate(
+            {
+                "id": qid,
+                "question": "test question?",
+                "gold_article_ids": gold,
+                "type": "factual",
+                "source": "human",
+                "status": status,
+            }
+        )
+
+    questions = [q("q-0001", ["gdpr:art-6"], "validated"), q("q-0002", ["gdpr:art-9"], "rejected")]
+    assert covered_articles(questions) == {"gdpr:art-6"}

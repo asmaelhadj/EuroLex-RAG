@@ -195,6 +195,11 @@ def build_candidates(
     return drafts
 
 
+def covered_articles(questions: Iterable[Question]) -> set[str]:
+    """Article ids already used as gold by a question that was not rejected."""
+    return {g for q in questions if q.status != "rejected" for g in q.gold_article_ids}
+
+
 def append_candidates(drafts: Iterable[Draft], path: Path) -> list[Question]:
     """Add drafts as pending llm_candidate rows, skipping near-duplicates of existing ones."""
     questions = load_questions(path)
@@ -233,6 +238,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--questions", type=Path, default=QUESTIONS_PATH)
     parser.add_argument("--articles-file", type=Path, default=Path("data/processed/articles.jsonl"))
     parser.add_argument("--allow-same-model", action="store_true")
+    parser.add_argument(
+        "--skip-covered", action="store_true", help="only articles no question points to yet"
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -249,10 +257,15 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
+    articles = load_articles(args.articles_file)
+    if args.skip_covered:
+        covered = covered_articles(load_questions(args.questions))
+        articles = {k: v for k, v in articles.items() if k not in covered}
+        print(f"{len(articles)} articles without a question yet", file=sys.stderr)
     llm = OllamaClient(settings.ollama_base_url, model, seed=args.seed, timeout_seconds=300)
     drafts = build_candidates(
         CandidateGenerator(llm),
-        load_articles(args.articles_file),
+        articles,
         n_articles=args.articles,
         per_article=args.per_article,
         n_false_premise=args.false_premise,
