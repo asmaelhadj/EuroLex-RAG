@@ -32,7 +32,8 @@ def _cos(a: list[float], b: list[float]) -> float:
 def test_output_shapes(embedder) -> None:  # type: ignore[no-untyped-def]
     (vec,) = embedder.embed(["The controller shall notify the supervisory authority."])
     assert embedder.dense_dim == len(vec.dense) == 1024
-    assert math.isclose(math.sqrt(sum(x * x for x in vec.dense)), 1.0, rel_tol=1e-4)
+    # 1e-3 because fp16 on GPU only keeps ~3 significant digits
+    assert math.isclose(math.sqrt(sum(x * x for x in vec.dense)), 1.0, rel_tol=1e-3)
     assert vec.sparse.indices == sorted(set(vec.sparse.indices))
     assert all(v > 0 for v in vec.sparse.values)
 
