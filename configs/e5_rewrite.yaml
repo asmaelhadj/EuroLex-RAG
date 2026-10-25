@@ -15,5 +15,9 @@ retrieval:
     candidates: 50
   rewrite:
     enabled: true
-    mode: expand  # model defaults to LLM_MODEL
+    mode: expand
+    # differs from mistral, which generated the candidate questions
+    model: llama3.2:3b
+    # run on CPU: the 4 GB GPU cannot hold it next to the reranker
+    gpu_layers: 0
   top_k: 10
