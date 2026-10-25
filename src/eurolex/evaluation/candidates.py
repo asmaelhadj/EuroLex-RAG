@@ -142,10 +142,13 @@ class CandidateGenerator:
         ]
 
     def out_of_scope(self, n: int) -> list[Draft]:
+        # near misses: they sound like privacy questions, so refusing them is not trivial
         prompt = (
-            f"Write {n} questions that someone might ask a GDPR assistant but that the GDPR "
-            "does NOT answer: other laws, national tax or employment rules, contracts, "
-            "non-EU privacy laws, or topics with no legal angle. Vary them."
+            f"Write {n} questions that sound like data protection or privacy questions but "
+            "that the GDPR itself does NOT answer. Draw on topics such as: the EU AI Act, "
+            "cookie banner rules under the ePrivacy Directive, US or Californian privacy law, "
+            "the UK ICO registration fee, national employment or tax law, consumer contract "
+            "rules, copyright. Do not ask how the GDPR applies to something. Vary them."
         )
         return [
             Draft(text, qtype, [], self._note("out of scope", ["no article"]))
