@@ -125,6 +125,7 @@ def run_experiment(
                 "status": q.status,
                 "gold": q.gold_article_ids,
                 "rewritten_query": result.rewritten_query,
+                "rewrite_failed": result.rewrite_failed,
                 "retrieved": [
                     {
                         "chunk_id": h.chunk.chunk_id,
@@ -150,6 +151,9 @@ def run_experiment(
         not_reportable.append(f"limited to {limit} questions")
     if not in_scope:
         not_reportable.append("no in-scope questions")
+    failed_rewrites = sum(r["rewrite_failed"] for r in rows)
+    if failed_rewrites:
+        not_reportable.append(f"query rewriting failed for {failed_rewrites} questions")
 
     timestamp = datetime.now(UTC)
     question_hash = hashlib.sha256(

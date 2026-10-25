@@ -114,6 +114,8 @@ class RetrievalResult(_Frozen):
     query: str
     # Set when query rewriting is on.
     rewritten_query: str | None = None
+    # rewriting was on but the LLM failed, so the original question was used
+    rewrite_failed: bool = False
     hits: list[ScoredChunk]
     # Stage name -> milliseconds, e.g. {"dense": 41.2, "fusion": 0.1}.
     latency_ms: dict[str, float]
