@@ -77,7 +77,9 @@ def git_info() -> dict[str, Any]:
         cmd = ["git", *args]
         return subprocess.run(cmd, capture_output=True, text=True, check=False).stdout.strip()  # noqa: S603
 
-    return {"commit": run("rev-parse", "HEAD") or None, "dirty": bool(run("status", "--porcelain"))}
+    # saved runs are outputs, not code, so they must not make the tree look dirty
+    status = run("status", "--porcelain", "--", ".", ":(exclude)runs")
+    return {"commit": run("rev-parse", "HEAD") or None, "dirty": bool(status)}
 
 
 def device_info() -> dict[str, Any]:
