@@ -26,6 +26,8 @@ from eurolex.evaluation.questions import (
 from eurolex.schemas import Question, QuestionSource
 
 _PARENS = re.compile(r"\([^)]*\)")
+# recitals are not articles, so "Recital 18" must not become art-18
+_RECITALS = re.compile(r"\bRecitals?\s+\d+(?:\s*(?:,|and|to|-|\u2013)\s*\d+)*", re.I)
 _RANGE = re.compile(r"(\d+)\s*[-\u2013\u2014]\s*(\d+)")  # hyphen, en dash, em dash
 _NUMBER = re.compile(r"\d+")
 _OBLIGATION = re.compile(r"\b(must|should|have to|has to|required|need to|appoint)\b", re.I)
@@ -37,7 +39,7 @@ def parse_gold(text: str, act_id: str = "gdpr") -> list[str]:
 
     Only the part before the first ';' is read, the rest is a note.
     """
-    head = _PARENS.sub("", text.split(";")[0])
+    head = _PARENS.sub("", _RECITALS.sub(" ", text.split(";")[0]))
     numbers: list[int] = []
     for start, end in _RANGE.findall(head):
         numbers += range(int(start), int(end) + 1)
