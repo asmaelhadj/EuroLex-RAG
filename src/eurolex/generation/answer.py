@@ -4,7 +4,12 @@ import time
 
 from eurolex.generation.citations import check_citations, resolve
 from eurolex.generation.llm import LLMClient
-from eurolex.generation.prompts import CANNOT_ANSWER, SYSTEM_PROMPT, build_prompt
+from eurolex.generation.prompts import (
+    CANNOT_ANSWER,
+    SYSTEM_PROMPT,
+    build_prompt,
+    enforce_ending,
+)
 from eurolex.generation.refusal import low_evidence
 from eurolex.retrieval.pipeline import RetrievalPipeline
 from eurolex.schemas import Answer
@@ -59,7 +64,7 @@ class AnswerGenerator:
         refused = check.text.startswith(CANNOT_ANSWER)
         return Answer(
             question=question,
-            answer=check.text,
+            answer=enforce_ending(check.text),
             refused=refused,
             refusal_reason="model" if refused else None,
             citations=resolve(check.valid, passages),
