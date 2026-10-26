@@ -203,6 +203,9 @@ class RewriteConfig(_YamlModel):
     gpu_layers: int | None = Field(default=None, ge=0)
 
 
+RecitalMode = Literal["include", "support", "exclude"]
+
+
 class RetrievalConfig(_YamlModel):
     collection: str
     # which chunks_<chunker>.jsonl BM25 reads
@@ -215,6 +218,10 @@ class RetrievalConfig(_YamlModel):
     top_k: int = Field(default=10, gt=0)
     # CPU by default so a small GPU is left for the reranker
     query_device: Literal["auto", "cpu", "cuda"] = "cpu"
+    # include: recitals compete with articles; support: only articles are ranked and the
+    # best recitals come back separately as context; exclude: articles only
+    recitals: RecitalMode = "include"
+    support_k: int = Field(default=3, ge=0)
 
 
 class ExperimentConfig(_YamlModel):

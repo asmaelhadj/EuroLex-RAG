@@ -11,6 +11,7 @@ from qdrant_client import QdrantClient
 from eurolex.config import (
     ConfigError,
     IngestConfig,
+    RecitalMode,
     RetrievalConfig,
     RetrieverSpec,
     get_settings,
@@ -24,7 +25,7 @@ from eurolex.retrieval.fusion import reciprocal_rank_fusion
 from eurolex.retrieval.rerank import BGEReranker, Reranker
 from eurolex.retrieval.rewrite import QueryRewriter
 from eurolex.retrieval.sparse import BM25Retriever, SparseRetriever
-from eurolex.schemas import Chunk, RetrievalResult, ScoredChunk
+from eurolex.schemas import Chunk, ChunkKind, RetrievalResult, ScoredChunk
 
 
 class CachingEmbedder:
@@ -72,6 +73,8 @@ class RetrievalPipeline:
         reranker: Reranker | None = None,
         rerank_candidates: int = 50,
         rewriter: QueryRewriter | None = None,
+        recitals: RecitalMode = "include",
+        support_k: int = 3,
     ) -> None:
         if not stages:
             raise ValueError("need at least one retriever")
@@ -82,6 +85,8 @@ class RetrievalPipeline:
         self._reranker = reranker
         self._rerank_candidates = rerank_candidates
         self._rewriter = rewriter
+        self._recitals = recitals
+        self._support_k = support_k
 
     def run(self, question: str, act_id: str | None = None) -> RetrievalResult:
         latency: dict[str, float] = {}
@@ -103,10 +108,12 @@ class RetrievalPipeline:
             self._embedder.embed([query])
             latency["embed_query"] = _ms(start)
 
+        # outside "include", only articles are ranked and scored
+        kind: ChunkKind | None = None if self._recitals == "include" else "article"
         rankings: list[list[ScoredChunk]] = []
         for stage in self._stages:
             start = time.perf_counter()
-            rankings.append(stage.retriever.retrieve(query, stage.spec.top_k, act_id))
+            rankings.append(stage.retriever.retrieve(query, stage.spec.top_k, act_id, kind))
             latency[stage.retriever.name] = _ms(start)
 
         if len(rankings) == 1:
@@ -128,12 +135,20 @@ class RetrievalPipeline:
         else:
             hits = list(candidates[: self._top_k])
 
+        support: list[ScoredChunk] = []
+        if self._recitals == "support":
+            # recitals explain the articles; they go to the answer as context, not to the ranking
+            start = time.perf_counter()
+            support = self._stages[0].retriever.retrieve(query, self._support_k, act_id, "recital")
+            latency["support"] = _ms(start)
+
         latency["total"] = round(sum(latency.values()), 2)
         return RetrievalResult(
             query=question,
             rewritten_query=rewritten,
             rewrite_failed=rewrite_failed,
             hits=hits,
+            support=support,
             latency_ms=latency,
         )
 
@@ -217,6 +232,8 @@ def build_pipeline(
         reranker=reranker if config.rerank.enabled else None,
         rerank_candidates=config.rerank.candidates,
         rewriter=rewriter,
+        recitals=config.recitals,
+        support_k=config.support_k,
     )
 
 
