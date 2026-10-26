@@ -1,0 +1,191 @@
+{
+  "run_id": "20261026-195453_e5_rewrite_dev",
+  "experiment": "e5_rewrite",
+  "description": "E4 + LLM query rewriting (original question + rewrite)",
+  "split": "dev",
+  "timestamp": "2026-10-26T19:54:53+00:00",
+  "reportable": true,
+  "not_reportable_because": [],
+  "git": {
+    "commit": "0935562a5255a22b7f14af49d8c383b8dd300171",
+    "dirty": false
+  },
+  "seed": 42,
+  "device": {
+    "torch": "2.14.1+cu126",
+    "python": "3.12.7",
+    "gpu": "NVIDIA GeForce GTX 1650 with Max-Q Design"
+  },
+  "config": {
+    "experiment": {
+      "name": "e5_rewrite",
+      "description": "E4 + LLM query rewriting (original question + rewrite)",
+      "ingest_config": "configs\\ingest.yaml",
+      "retrieval": {
+        "collection": "eurolex_article",
+        "chunker": "article",
+        "retrievers": [
+          {
+            "type": "dense",
+            "top_k": 50,
+            "weight": 1.0
+          },
+          {
+            "type": "sparse",
+            "top_k": 50,
+            "weight": 1.0
+          }
+        ],
+        "fusion": {
+          "k": 60
+        },
+        "rerank": {
+          "enabled": true,
+          "model": "BAAI/bge-reranker-v2-m3",
+          "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+          "candidates": 50,
+          "max_length": 1024,
+          "batch_size": 8,
+          "prepend_header": true,
+          "device": "auto",
+          "precision": "fp32"
+        },
+        "rewrite": {
+          "enabled": true,
+          "model": "llama3.2:3b",
+          "mode": "expand",
+          "gpu_layers": 0
+        },
+        "top_k": 10,
+        "query_device": "cpu"
+      }
+    },
+    "embedding": {
+      "model": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "max_length": 1024,
+      "batch_size": 8,
+      "device": "auto",
+      "precision": "fp32"
+    },
+    "chunking": {
+      "article": {
+        "max_tokens": 512
+      },
+      "fixed": {
+        "size_tokens": 256,
+        "overlap_tokens": 32
+      }
+    }
+  },
+  "question_set": {
+    "sha256": "30272fdd33a25ae70177e625f1169d99e3aeca949d6aeb3281ace03c352a0f1c",
+    "n": 75,
+    "n_in_scope": 60,
+    "n_out_of_scope": 15,
+    "by_source": {
+      "faq": 18,
+      "llm_candidate": 57
+    }
+  },
+  "metrics": {
+    "all": {
+      "n": 60,
+      "recall@1": 0.4167,
+      "recall@3": 0.7611,
+      "recall@5": 0.8278,
+      "recall@10": 0.925,
+      "mrr": 0.6219,
+      "ndcg@10": 0.6906
+    },
+    "human_core": {
+      "n": 18,
+      "recall@1": 0.4167,
+      "recall@3": 0.6944,
+      "recall@5": 0.8333,
+      "recall@10": 0.9444,
+      "mrr": 0.6236,
+      "ndcg@10": 0.6928
+    },
+    "by_type": {
+      "definition": {
+        "n": 3,
+        "recall@1": 0.3333,
+        "recall@3": 0.3333,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 0.5,
+        "ndcg@10": 0.6205
+      },
+      "factual": {
+        "n": 23,
+        "recall@1": 0.5217,
+        "recall@3": 0.8261,
+        "recall@5": 0.8261,
+        "recall@10": 0.9565,
+        "mrr": 0.6746,
+        "ndcg@10": 0.7424
+      },
+      "multi_article": {
+        "n": 8,
+        "recall@1": 0.125,
+        "recall@3": 0.3333,
+        "recall@5": 0.4583,
+        "recall@10": 0.8125,
+        "mrr": 0.4708,
+        "ndcg@10": 0.5085
+      },
+      "obligation": {
+        "n": 20,
+        "recall@1": 0.5,
+        "recall@3": 0.95,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 0.7267,
+        "ndcg@10": 0.7967
+      },
+      "paraphrase": {
+        "n": 6,
+        "recall@1": 0.1667,
+        "recall@3": 0.6667,
+        "recall@5": 0.6667,
+        "recall@10": 0.6667,
+        "mrr": 0.3333,
+        "ndcg@10": 0.4167
+      }
+    }
+  },
+  "out_of_scope_top_score": {
+    "mean": 0.0017990848484307645
+  },
+  "latency_ms": {
+    "dense": {
+      "p50": 12.79,
+      "p95": 31.81
+    },
+    "embed_query": {
+      "p50": 442.46,
+      "p95": 650.85
+    },
+    "fusion": {
+      "p50": 0.32,
+      "p95": 0.5
+    },
+    "rerank": {
+      "p50": 13896.35,
+      "p95": 16565.52
+    },
+    "rewrite": {
+      "p50": 3542.14,
+      "p95": 4766.3
+    },
+    "sparse": {
+      "p50": 12.39,
+      "p95": 31.63
+    },
+    "total": {
+      "p50": 17959.21,
+      "p95": 21471.23
+    }
+  }
+}

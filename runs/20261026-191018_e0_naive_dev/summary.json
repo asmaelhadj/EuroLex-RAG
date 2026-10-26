@@ -1,0 +1,170 @@
+{
+  "run_id": "20261026-191018_e0_naive_dev",
+  "experiment": "e0_naive",
+  "description": "Fixed-size chunks + dense (naive baseline)",
+  "split": "dev",
+  "timestamp": "2026-10-26T19:10:18+00:00",
+  "reportable": true,
+  "not_reportable_because": [],
+  "git": {
+    "commit": "0935562a5255a22b7f14af49d8c383b8dd300171",
+    "dirty": false
+  },
+  "seed": 42,
+  "device": {
+    "torch": "2.14.1+cu126",
+    "python": "3.12.7",
+    "gpu": "NVIDIA GeForce GTX 1650 with Max-Q Design"
+  },
+  "config": {
+    "experiment": {
+      "name": "e0_naive",
+      "description": "Fixed-size chunks + dense (naive baseline)",
+      "ingest_config": "configs\\ingest.yaml",
+      "retrieval": {
+        "collection": "eurolex_fixed",
+        "chunker": "fixed",
+        "retrievers": [
+          {
+            "type": "dense",
+            "top_k": 50,
+            "weight": 1.0
+          }
+        ],
+        "fusion": {
+          "k": 60
+        },
+        "rerank": {
+          "enabled": false,
+          "model": "BAAI/bge-reranker-v2-m3",
+          "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+          "candidates": 50,
+          "max_length": 1024,
+          "batch_size": 8,
+          "prepend_header": true,
+          "device": "auto",
+          "precision": "fp32"
+        },
+        "rewrite": {
+          "enabled": false,
+          "model": null,
+          "mode": "expand",
+          "gpu_layers": null
+        },
+        "top_k": 10,
+        "query_device": "cpu"
+      }
+    },
+    "embedding": {
+      "model": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "max_length": 1024,
+      "batch_size": 8,
+      "device": "auto",
+      "precision": "fp32"
+    },
+    "chunking": {
+      "article": {
+        "max_tokens": 512
+      },
+      "fixed": {
+        "size_tokens": 256,
+        "overlap_tokens": 32
+      }
+    }
+  },
+  "question_set": {
+    "sha256": "30272fdd33a25ae70177e625f1169d99e3aeca949d6aeb3281ace03c352a0f1c",
+    "n": 75,
+    "n_in_scope": 60,
+    "n_out_of_scope": 15,
+    "by_source": {
+      "faq": 18,
+      "llm_candidate": 57
+    }
+  },
+  "metrics": {
+    "all": {
+      "n": 60,
+      "recall@1": 0.2333,
+      "recall@3": 0.3417,
+      "recall@5": 0.4444,
+      "recall@10": 0.6028,
+      "mrr": 0.3386,
+      "ndcg@10": 0.3994
+    },
+    "human_core": {
+      "n": 18,
+      "recall@1": 0.1667,
+      "recall@3": 0.3056,
+      "recall@5": 0.3611,
+      "recall@10": 0.5278,
+      "mrr": 0.289,
+      "ndcg@10": 0.339
+    },
+    "by_type": {
+      "definition": {
+        "n": 3,
+        "recall@1": 0.0,
+        "recall@3": 0.0,
+        "recall@5": 0.0,
+        "recall@10": 0.3333,
+        "mrr": 0.0476,
+        "ndcg@10": 0.1111
+      },
+      "factual": {
+        "n": 23,
+        "recall@1": 0.3043,
+        "recall@3": 0.4783,
+        "recall@5": 0.5652,
+        "recall@10": 0.6522,
+        "mrr": 0.4077,
+        "ndcg@10": 0.4663
+      },
+      "multi_article": {
+        "n": 8,
+        "recall@1": 0.0,
+        "recall@3": 0.0625,
+        "recall@5": 0.2083,
+        "recall@10": 0.5208,
+        "mrr": 0.1962,
+        "ndcg@10": 0.2604
+      },
+      "obligation": {
+        "n": 20,
+        "recall@1": 0.35,
+        "recall@3": 0.45,
+        "recall@5": 0.55,
+        "recall@10": 0.75,
+        "mrr": 0.4488,
+        "ndcg@10": 0.5197
+      },
+      "paraphrase": {
+        "n": 6,
+        "recall@1": 0.0,
+        "recall@3": 0.0,
+        "recall@5": 0.1667,
+        "recall@10": 0.1667,
+        "mrr": 0.0417,
+        "ndcg@10": 0.0718
+      }
+    }
+  },
+  "out_of_scope_top_score": {
+    "mean": 0.38308027533333333
+  },
+  "latency_ms": {
+    "dense": {
+      "p50": 8.35,
+      "p95": 45.24
+    },
+    "embed_query": {
+      "p50": 296.62,
+      "p95": 400.62
+    },
+    "total": {
+      "p50": 318.37,
+      "p95": 409.76
+    }
+  }
+}
