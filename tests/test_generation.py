@@ -392,3 +392,39 @@ def test_threshold_tool_uses_dev_only(tmp_path: object) -> None:
     assert out.exists()
     (run / "results.json").write_text(json.dumps({**results, "split": "test"}), encoding="utf-8")
     assert main([str(run), "--out", str(out)]) == 1
+
+
+def test_answer_review_sample_and_summary(tmp_path: object) -> None:
+    import csv
+    from pathlib import Path
+
+    from eurolex.evaluation.answer_review import sample_rows, summary
+
+    def row(qid: str, qtype: str, refused: bool) -> dict[str, object]:
+        return {"id": qid, "type": qtype, "answer": {"refused": refused}}
+
+    results = {
+        "questions": [
+            row("q-0001", "factual", False),
+            row("q-0002", "factual", True),
+            row("q-0003", "out_of_scope", False),
+            row("q-0004", "obligation", False),
+        ]
+    }
+    picked = sample_rows(results, 5, seed=1)
+    assert [r["id"] for r in picked] == ["q-0001", "q-0004"]
+    assert sample_rows(results, 1, seed=1) == sample_rows(results, 1, seed=1)
+
+    path = Path(str(tmp_path)) / "review.csv"
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=["citations_correct", "answer_correct"])
+        writer.writeheader()
+        writer.writerow({"citations_correct": "yes", "answer_correct": "partly"})
+        writer.writerow({"citations_correct": "", "answer_correct": "no"})
+    lines = summary(path)
+    assert "citations_correct: not reviewed=1, yes=1" in lines[1]
+    assert "answer_correct: no=1, partly=1" in lines[2]
+    writer_bad = path.read_text(encoding="utf-8").replace("partly", "maybe")
+    path.write_text(writer_bad, encoding="utf-8")
+    with pytest.raises(ValueError, match="answer_correct"):
+        summary(path)
