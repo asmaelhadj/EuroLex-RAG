@@ -117,6 +117,8 @@ class RetrievalResult(_Frozen):
     # rewriting was on but the LLM failed, so the original question was used
     rewrite_failed: bool = False
     hits: list[ScoredChunk]
+    # extra context (recitals) that is not part of the ranking or the metrics
+    support: list[ScoredChunk] = Field(default_factory=list)
     # Stage name -> milliseconds, e.g. {"dense": 41.2, "fusion": 0.1}.
     latency_ms: dict[str, float]
 

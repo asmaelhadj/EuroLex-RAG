@@ -136,6 +136,7 @@ def run_experiment(
                     }
                     for h in result.hits
                 ],
+                "support": [h.chunk.chunk_id for h in result.support],
                 "top_score": result.hits[0].score if result.hits else None,
                 "metrics": score_question(q, retrieved) if q.in_scope else None,
                 "latency_ms": result.latency_ms,

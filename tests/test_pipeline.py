@@ -211,9 +211,11 @@ def test_repo_experiment_configs_load() -> None:
     assert names == [
         "e0_naive",
         "e1_article_dense",
+        "e1s_articles_first",
         "e2_bm25",
         "e3_hybrid",
         "e4_rerank",
+        "e4s_articles_first",
         "e5_rewrite",
     ]
     for name in names:
@@ -288,3 +290,64 @@ def test_missing_rewrite_model_fails_fast(
     cfg = config("bm25", rewrite=RewriteConfig(enabled=True, model="not-pulled"))
     with pytest.raises(ConfigError, match="not-pulled is not installed"):
         build_pipeline(cfg, ingest)
+
+
+def recital(number: str, text: str) -> Chunk:
+    return Chunk(
+        chunk_id=f"gdpr:rct-{number}",
+        act_id="gdpr",
+        celex="x",
+        kind="recital",
+        article_number=None,
+        article_title=None,
+        paragraph=None,
+        chapter=None,
+        recital_number=number,
+        text=text,
+        source_url="https://example.test",
+        char_count=len(text),
+    )
+
+
+@pytest.fixture
+def with_recitals(tmp_path: Path) -> tuple[IngestConfig, QdrantClient]:
+    chunks = [*CHUNKS[:4], recital("1", "alpha bravo charlie delta"), recital("2", "echo foxtrot")]
+    ingest = load_ingest_config(ROOT / "configs" / "ingest.yaml").model_copy(
+        update={"processed_dir": tmp_path}
+    )
+    write_jsonl(tmp_path / "chunks_article.jsonl", chunks)
+    qdrant = QdrantClient(":memory:")
+    embedder = FakeEmbedder()
+    ensure_collection(qdrant, "eurolex_article", embedder.dense_dim, recreate=False)
+    sync_collection(
+        qdrant, "eurolex_article", chunks, embedder, {}, prepend_header=False, batch_size=10
+    )
+    return ingest, qdrant
+
+
+@pytest.mark.parametrize("types", [("dense",), ("dense", "sparse"), ("bm25",)])
+def test_recital_modes(
+    with_recitals: tuple[IngestConfig, QdrantClient], types: tuple[str, ...]
+) -> None:
+    ingest, qdrant = with_recitals
+    query = "alpha bravo charlie delta"
+
+    def run(**extra: Any) -> Any:
+        cfg = config(*types, **extra)
+        return build_pipeline(cfg, ingest, client=qdrant, embedder=FakeEmbedder()).run(query)
+
+    included = run()
+    assert "gdpr:rct-1" in ids(included.hits)  # recitals compete with articles
+    assert included.support == []
+
+    supported = run(recitals="support", support_k=2)
+    assert all(h.chunk.kind == "article" for h in supported.hits)
+    assert ids(supported.hits)[0] == "gdpr:art-1"
+    assert supported.support
+    assert all(h.chunk.kind == "recital" for h in supported.support)
+    assert "gdpr:rct-1" in ids(supported.support)
+    assert "support" in supported.latency_ms
+
+    excluded = run(recitals="exclude")
+    assert all(h.chunk.kind == "article" for h in excluded.hits)
+    assert excluded.support == []

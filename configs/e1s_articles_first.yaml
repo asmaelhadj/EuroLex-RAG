@@ -1,0 +1,10 @@
+name: e1s_articles_first
+description: E1 with articles ranked alone; top recitals returned as support context
+retrieval:
+  collection: eurolex_article
+  chunker: article
+  retrievers:
+    - type: dense
+  recitals: support
+  support_k: 3
+  top_k: 10

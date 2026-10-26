@@ -8,8 +8,8 @@ from rank_bm25 import BM25Okapi
 
 from eurolex.embeddings import Embedder
 from eurolex.ingestion.index import SPARSE
-from eurolex.retrieval.base import act_filter, chunk_from_payload
-from eurolex.schemas import Chunk, ScoredChunk
+from eurolex.retrieval.base import chunk_from_payload, payload_filter
+from eurolex.schemas import Chunk, ChunkKind, ScoredChunk
 
 _WORD = re.compile(r"\w+")
 
@@ -26,7 +26,9 @@ class SparseRetriever:
         self._collection = collection
         self._embedder = embedder
 
-    def retrieve(self, query: str, k: int, act_id: str | None = None) -> list[ScoredChunk]:
+    def retrieve(
+        self, query: str, k: int, act_id: str | None = None, kind: ChunkKind | None = None
+    ) -> list[ScoredChunk]:
         (vec,) = self._embedder.embed([query])
         if not vec.sparse.indices:
             return []
@@ -34,7 +36,7 @@ class SparseRetriever:
             self._collection,
             query=models.SparseVector(indices=vec.sparse.indices, values=vec.sparse.values),
             using=SPARSE,
-            query_filter=act_filter(act_id),
+            query_filter=payload_filter(act_id, kind),
             limit=k,
             with_payload=True,
         ).points
@@ -50,13 +52,19 @@ class BM25Retriever:
         self._chunks = list(chunks)
         self._bm25 = BM25Okapi([tokenize(c.text) for c in self._chunks], k1=k1, b=b)
 
-    def retrieve(self, query: str, k: int, act_id: str | None = None) -> list[ScoredChunk]:
+    def retrieve(
+        self, query: str, k: int, act_id: str | None = None, kind: ChunkKind | None = None
+    ) -> list[ScoredChunk]:
         tokens = tokenize(query)
         if not tokens:
             return []
         scores = self._bm25.get_scores(tokens)
         ranked = sorted(
-            (i for i, c in enumerate(self._chunks) if act_id is None or c.act_id == act_id),
+            (
+                i
+                for i, c in enumerate(self._chunks)
+                if (act_id is None or c.act_id == act_id) and (kind is None or c.kind == kind)
+            ),
             # ties broken by chunk id so runs are repeatable
             key=lambda i: (-scores[i], self._chunks[i].chunk_id),
         )
