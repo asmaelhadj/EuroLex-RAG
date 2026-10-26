@@ -217,6 +217,8 @@ def test_repo_experiment_configs_load() -> None:
         "e4_rerank",
         "e4s_articles_first",
         "e5_rewrite",
+        "e7_generation",
+        "e7_threshold",
     ]
     for name in names:
         experiment = load_experiment_config(ROOT / "configs" / f"{name}.yaml")
