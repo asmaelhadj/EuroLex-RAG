@@ -1,0 +1,176 @@
+{
+  "run_id": "20261026-203041_e1s_articles_first_dev",
+  "experiment": "e1s_articles_first",
+  "description": "E1 with articles ranked alone; top recitals returned as support context",
+  "split": "dev",
+  "timestamp": "2026-10-26T20:30:41+00:00",
+  "reportable": true,
+  "not_reportable_because": [],
+  "git": {
+    "commit": "09727b2d05cbb60fe66aa698b6fcc26c7f8b5923",
+    "dirty": false
+  },
+  "seed": 42,
+  "device": {
+    "torch": "2.14.1+cu126",
+    "python": "3.12.7",
+    "gpu": "NVIDIA GeForce GTX 1650 with Max-Q Design"
+  },
+  "config": {
+    "experiment": {
+      "name": "e1s_articles_first",
+      "description": "E1 with articles ranked alone; top recitals returned as support context",
+      "ingest_config": "configs\\ingest.yaml",
+      "retrieval": {
+        "collection": "eurolex_article",
+        "chunker": "article",
+        "retrievers": [
+          {
+            "type": "dense",
+            "top_k": 50,
+            "weight": 1.0
+          }
+        ],
+        "fusion": {
+          "k": 60
+        },
+        "rerank": {
+          "enabled": false,
+          "model": "BAAI/bge-reranker-v2-m3",
+          "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+          "candidates": 50,
+          "max_length": 1024,
+          "batch_size": 8,
+          "prepend_header": true,
+          "device": "auto",
+          "precision": "fp32"
+        },
+        "rewrite": {
+          "enabled": false,
+          "model": null,
+          "mode": "expand",
+          "gpu_layers": null
+        },
+        "top_k": 10,
+        "query_device": "cpu",
+        "recitals": "support",
+        "support_k": 3
+      }
+    },
+    "embedding": {
+      "model": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "max_length": 1024,
+      "batch_size": 8,
+      "device": "auto",
+      "precision": "fp32"
+    },
+    "chunking": {
+      "article": {
+        "max_tokens": 512
+      },
+      "fixed": {
+        "size_tokens": 256,
+        "overlap_tokens": 32
+      }
+    }
+  },
+  "question_set": {
+    "sha256": "30272fdd33a25ae70177e625f1169d99e3aeca949d6aeb3281ace03c352a0f1c",
+    "n": 75,
+    "n_in_scope": 60,
+    "n_out_of_scope": 15,
+    "by_source": {
+      "faq": 18,
+      "llm_candidate": 57
+    }
+  },
+  "metrics": {
+    "all": {
+      "n": 60,
+      "recall@1": 0.7111,
+      "recall@3": 0.8361,
+      "recall@5": 0.8944,
+      "recall@10": 0.9611,
+      "mrr": 0.842,
+      "ndcg@10": 0.8564
+    },
+    "human_core": {
+      "n": 18,
+      "recall@1": 0.6389,
+      "recall@3": 0.7222,
+      "recall@5": 0.8889,
+      "recall@10": 0.9444,
+      "mrr": 0.744,
+      "ndcg@10": 0.792
+    },
+    "by_type": {
+      "definition": {
+        "n": 3,
+        "recall@1": 0.6667,
+        "recall@3": 0.6667,
+        "recall@5": 0.6667,
+        "recall@10": 0.6667,
+        "mrr": 0.6667,
+        "ndcg@10": 0.6667
+      },
+      "factual": {
+        "n": 23,
+        "recall@1": 0.6957,
+        "recall@3": 0.8696,
+        "recall@5": 0.9565,
+        "recall@10": 1.0,
+        "mrr": 0.8025,
+        "ndcg@10": 0.8509
+      },
+      "multi_article": {
+        "n": 8,
+        "recall@1": 0.3333,
+        "recall@3": 0.6458,
+        "recall@5": 0.7083,
+        "recall@10": 0.8333,
+        "mrr": 0.875,
+        "ndcg@10": 0.7582
+      },
+      "obligation": {
+        "n": 20,
+        "recall@1": 0.9,
+        "recall@3": 0.95,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 0.9375,
+        "ndcg@10": 0.9531
+      },
+      "paraphrase": {
+        "n": 6,
+        "recall@1": 0.6667,
+        "recall@3": 0.6667,
+        "recall@5": 0.6667,
+        "recall@10": 1.0,
+        "mrr": 0.7183,
+        "ndcg@10": 0.7816
+      }
+    }
+  },
+  "out_of_scope_top_score": {
+    "mean": 0.36345536
+  },
+  "latency_ms": {
+    "dense": {
+      "p50": 9.69,
+      "p95": 22.78
+    },
+    "embed_query": {
+      "p50": 269.61,
+      "p95": 357.2
+    },
+    "support": {
+      "p50": 4.97,
+      "p95": 21.19
+    },
+    "total": {
+      "p50": 290.99,
+      "p95": 383.28
+    }
+  }
+}

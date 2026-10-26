@@ -5,9 +5,9 @@ Retrieval metrics are article-level (see `src/eurolex/evaluation/metrics.py`); o
 
 ## Question set
 
-- dev: TODO (no reportable runs)
+- dev: 75 questions (60 in scope, 15 out of scope); by source: faq: 18, llm_candidate: 57
 - test: TODO (no reportable runs)
-- LLM candidates rejected in review: TODO
+- LLM candidates rejected in review: 39/114 (34%)
 - Annotators: TODO (fill in)
 
 ## Test split (final numbers)
@@ -16,4 +16,52 @@ TODO: no reportable runs on the test split yet. Run `make eval CONFIG=configs/<e
 
 ## Dev split (used for tuning)
 
-TODO: no reportable runs on the dev split yet. Run `make eval CONFIG=configs/<experiment>.yaml SPLIT=dev`.
+All in-scope questions:
+
+| Experiment | n | R@1 | R@5 | R@10 | MRR | nDCG@10 | p50 latency |
+|---|---|---|---|---|---|---|---|
+| e0_naive | 60 | 0.233 | 0.444 | 0.603 | 0.339 | 0.399 | 0.3 s |
+| e1_article_dense | 60 | 0.422 | 0.811 | 0.869 | 0.610 | 0.669 | 0.3 s |
+| e1s_articles_first | 60 | 0.711 | 0.894 | 0.961 | 0.842 | 0.856 | 0.3 s |
+| e2_bm25 | 60 | 0.189 | 0.386 | 0.461 | 0.283 | 0.320 | 0.0 s |
+| e3_hybrid | 60 | 0.439 | 0.747 | 0.861 | 0.591 | 0.653 | 0.3 s |
+| e4_rerank | 60 | 0.425 | 0.819 | 0.903 | 0.628 | 0.685 | 14.5 s |
+| e4s_articles_first | 60 | 0.725 | 0.864 | 0.967 | 0.813 | 0.847 | 15.4 s |
+| e5_rewrite | 60 | 0.417 | 0.828 | 0.925 | 0.622 | 0.691 | 18.0 s |
+
+Human-written / FAQ core only:
+
+| Experiment | n | R@1 | R@5 | R@10 | MRR | nDCG@10 |
+|---|---|---|---|---|---|---|
+| e0_naive | 18 | 0.167 | 0.361 | 0.528 | 0.289 | 0.339 |
+| e1_article_dense | 18 | 0.333 | 0.778 | 0.833 | 0.535 | 0.610 |
+| e1s_articles_first | 18 | 0.639 | 0.889 | 0.944 | 0.744 | 0.792 |
+| e2_bm25 | 18 | 0.167 | 0.333 | 0.417 | 0.237 | 0.278 |
+| e3_hybrid | 18 | 0.389 | 0.750 | 0.750 | 0.546 | 0.591 |
+| e4_rerank | 18 | 0.417 | 0.833 | 0.889 | 0.617 | 0.676 |
+| e4s_articles_first | 18 | 0.750 | 0.833 | 0.889 | 0.804 | 0.820 |
+| e5_rewrite | 18 | 0.417 | 0.833 | 0.944 | 0.624 | 0.693 |
+
+By question type (nDCG@10):
+
+| Experiment | definition | factual | multi_article | obligation | paraphrase |
+|---|---|---|---|---|---|
+| e0_naive | 0.111 (n=3) | 0.466 (n=23) | 0.260 (n=8) | 0.520 (n=20) | 0.072 (n=6) |
+| e1_article_dense | 0.500 (n=3) | 0.710 (n=23) | 0.429 (n=8) | 0.802 (n=20) | 0.472 (n=6) |
+| e1s_articles_first | 0.667 (n=3) | 0.851 (n=23) | 0.758 (n=8) | 0.953 (n=20) | 0.782 (n=6) |
+| e2_bm25 | 0.119 (n=3) | 0.384 (n=23) | 0.162 (n=8) | 0.436 (n=20) | 0.000 (n=6) |
+| e3_hybrid | 0.667 (n=3) | 0.701 (n=23) | 0.317 (n=8) | 0.814 (n=20) | 0.371 (n=6) |
+| e4_rerank | 0.621 (n=3) | 0.728 (n=23) | 0.457 (n=8) | 0.797 (n=20) | 0.487 (n=6) |
+| e4s_articles_first | 0.833 (n=3) | 0.897 (n=23) | 0.650 (n=8) | 0.953 (n=20) | 0.572 (n=6) |
+| e5_rewrite | 0.621 (n=3) | 0.742 (n=23) | 0.508 (n=8) | 0.797 (n=20) | 0.417 (n=6) |
+
+Runs used:
+
+- `20261026-191018_e0_naive_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261026-191122_e1_article_dense_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261026-203041_e1s_articles_first_dev`: commit 09727b2d, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261026-190606_e2_bm25_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261026-191231_e3_hybrid_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261026-193105_e4_rerank_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261026-221116_e4s_articles_first_dev`: commit 09727b2d, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261026-195453_e5_rewrite_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
