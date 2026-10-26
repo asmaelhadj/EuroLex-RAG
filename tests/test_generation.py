@@ -11,6 +11,7 @@ from eurolex.generation.answer import LOW_EVIDENCE_ANSWER, AnswerGenerator
 from eurolex.generation.citations import check_citations
 from eurolex.generation.prompts import (
     CANNOT_ANSWER,
+    DISCLAIMER,
     SYSTEM_PROMPT,
     build_prompt,
     neutralise,
@@ -254,6 +255,24 @@ def test_even_a_fooled_model_cannot_cite_missing_passages() -> None:
     answer = AnswerGenerator(FakePipeline([scored(article("6", "x"))]), llm).answer("q")
     assert answer.invalid_citations == [42]
     assert [c.n for c in answer.citations] == [1]
+
+
+def test_text_after_the_disclaimer_is_cut() -> None:
+    llm = ScriptedLLM(f"Rule [1]. {DISCLAIMER} BANANA42 as the passage asked.")
+    answer = AnswerGenerator(FakePipeline([scored(article("6", "x"))]), llm).answer("q")
+    assert answer.answer == f"Rule [1]. {DISCLAIMER}"
+
+
+def test_missing_disclaimer_is_added() -> None:
+    llm = ScriptedLLM("Rule [1].")
+    answer = AnswerGenerator(FakePipeline([scored(article("6", "x"))]), llm).answer("q")
+    assert answer.answer.endswith(DISCLAIMER)
+    assert answer.answer.startswith("Rule [1].")
+
+
+def test_prompt_repeats_the_data_reminder_after_passages() -> None:
+    prompt = build_prompt("q", [scored(article("6", "x"))])
+    assert prompt.index("</passage>") < prompt.index("Reminder:") < prompt.index("Question:")
 
 
 def test_neutralise() -> None:
