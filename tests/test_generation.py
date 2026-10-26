@@ -363,3 +363,32 @@ def test_generation_metrics_with_refusals() -> None:
     assert g["false_refusal_rate_in_scope"] == 0.5
     assert (g["refused_low_evidence"], g["refused_by_model"]) == (2, 1)
     assert g["citation_validity"] is None  # no markers at all
+
+
+def test_threshold_tool_uses_dev_only(tmp_path: object) -> None:
+    from pathlib import Path
+
+    from eurolex.evaluation.threshold import main, score_groups
+
+    def row(qtype: str, score: float, found: bool) -> dict[str, object]:
+        return {
+            "type": qtype,
+            "top_score": score,
+            "metrics": None if qtype == "out_of_scope" else {"recall@10": 1.0 if found else 0.0},
+        }
+
+    rows = [row("factual", 0.8, True), row("factual", 0.6, False), row("out_of_scope", 0.3, False)]
+    results = {"experiment": "e1s", "split": "dev", "questions": rows}
+    assert score_groups(results) == {
+        "answerable": [0.8],
+        "in scope, gold missed": [0.6],
+        "out of scope": [0.3],
+    }
+    run = Path(str(tmp_path)) / "run"
+    run.mkdir()
+    (run / "results.json").write_text(json.dumps(results), encoding="utf-8")
+    out = Path(str(tmp_path)) / "plot.png"
+    assert main([str(run), "--out", str(out)]) == 0
+    assert out.exists()
+    (run / "results.json").write_text(json.dumps({**results, "split": "test"}), encoding="utf-8")
+    assert main([str(run), "--out", str(out)]) == 1

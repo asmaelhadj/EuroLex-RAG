@@ -1,0 +1,17 @@
+name: e7_generation
+description: E1s retrieval + qwen2.5 answers, no evidence threshold
+retrieval:
+  collection: eurolex_article
+  chunker: article
+  retrievers:
+    - type: dense
+  recitals: support
+  support_k: 3
+  top_k: 10
+generation:
+  enabled: true
+  model: qwen2.5:7b-instruct
+  # different from the answer model; also wrote some candidate questions, but it only grades
+  judge_model: mistral:latest
+  context_k: 8
+  threshold: null
