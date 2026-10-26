@@ -46,6 +46,30 @@ def _metric_row(label: str, m: dict[str, Any], extra: list[str]) -> str:
     return "| " + " | ".join(cells) + " |"
 
 
+GEN_COLUMNS = [
+    ("refusal_accuracy_out_of_scope", "Refusal acc. (out of scope)"),
+    ("false_refusal_rate_in_scope", "False refusals (in scope)"),
+    ("citation_validity", "Citation validity"),
+    ("cites_gold", "Cites a gold article"),
+    ("faithfulness_mean", "Faithfulness (1-5)"),
+    ("relevance_mean", "Relevance (1-5)"),
+]
+
+
+def generation_table(chosen: list[dict[str, Any]]) -> list[str]:
+    with_gen = [s for s in chosen if s.get("generation")]
+    if not with_gen:
+        return []
+    lines = ["", "Generation (judge: see config; scores 1-5 from an LLM judge):", ""]
+    lines += ["| Experiment | " + " | ".join(h for _, h in GEN_COLUMNS) + " | judged |"]
+    lines += ["|" + "---|" * (len(GEN_COLUMNS) + 2)]
+    for s in with_gen:
+        g = s["generation"]
+        cells = [_cell(g.get(key)) for key, _ in GEN_COLUMNS]
+        lines.append(f"| {s['experiment']} | " + " | ".join(cells) + f" | {g.get('judged', 0)} |")
+    return lines
+
+
 def split_section(split: str, runs: dict[tuple[str, str], dict[str, Any]]) -> list[str]:
     chosen = sorted(
         (s for (_, sp), s in runs.items() if sp == split), key=lambda s: s["experiment"]
@@ -86,6 +110,7 @@ def split_section(split: str, runs: dict[tuple[str, str], dict[str, Any]]) -> li
             for t in types
         ]
         lines.append(f"| {s['experiment']} | " + " | ".join(cells) + " |")
+    lines += generation_table(chosen)
     lines += ["", "Runs used:", ""]
     for s in chosen:
         commit = (s["git"].get("commit") or "unknown")[:8] + (

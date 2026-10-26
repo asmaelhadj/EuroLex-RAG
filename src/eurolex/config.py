@@ -224,11 +224,26 @@ class RetrievalConfig(_YamlModel):
     support_k: int = Field(default=3, ge=0)
 
 
+class GenerationConfig(_YamlModel):
+    enabled: bool = False
+    # None means LLM_MODEL / JUDGE_MODEL from the environment
+    model: str | None = None
+    judge_model: str | None = None
+    judge: bool = True
+    # passages from the ranking given to the model; support recitals come on top
+    context_k: int = Field(default=8, gt=0)
+    # refuse without calling the model when the top retrieval score is below this
+    threshold: float | None = None
+    gpu_layers: int | None = Field(default=None, ge=0)
+    timeout_seconds: float = Field(default=300, gt=0)
+
+
 class ExperimentConfig(_YamlModel):
     name: str = Field(pattern=r"^[a-z0-9_]+$")
     description: str
     ingest_config: Path = Path("configs/ingest.yaml")
     retrieval: RetrievalConfig
+    generation: GenerationConfig = GenerationConfig()
 
 
 def load_experiment_config(path: Path) -> ExperimentConfig:

@@ -163,3 +163,30 @@ class Question(BaseModel):
     @property
     def in_scope(self) -> bool:
         return self.type != "out_of_scope"
+
+
+class Citation(_Frozen):
+    """A `[n]` marker in an answer, resolved to the passage it points at."""
+
+    n: int
+    chunk_id: str
+    article_id: str | None
+    article_title: str | None
+    text: str
+    url: str
+
+
+RefusalReason = Literal["low_evidence", "model"]
+
+
+class Answer(_Frozen):
+    question: str
+    answer: str
+    refused: bool
+    refusal_reason: RefusalReason | None = None
+    citations: list[Citation] = Field(default_factory=list)
+    # [n] markers that pointed at no passage; they are removed from `answer`
+    invalid_citations: list[int] = Field(default_factory=list)
+    passages: list[ScoredChunk] = Field(default_factory=list)
+    retrieval: RetrievalResult
+    latency_ms: dict[str, float]
