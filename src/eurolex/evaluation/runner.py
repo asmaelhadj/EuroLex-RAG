@@ -13,6 +13,7 @@ import random
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -20,15 +21,19 @@ from typing import Any
 from eurolex.config import (
     ConfigError,
     ExperimentConfig,
+    GenerationConfig,
     IngestConfig,
     get_settings,
     load_experiment_config,
     load_ingest_config,
 )
+from eurolex.evaluation.judge import Judge
 from eurolex.evaluation.metrics import mean, ndcg_at_k, percentile, recall_at_k, reciprocal_rank
 from eurolex.evaluation.questions import QUESTIONS_PATH, load_questions
+from eurolex.generation.answer import AnswerGenerator
+from eurolex.generation.llm import OllamaClient
 from eurolex.retrieval.pipeline import RetrievalPipeline, build_pipeline
-from eurolex.schemas import Question, Split
+from eurolex.schemas import Answer, Question, Split
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +105,71 @@ def set_seeds(seed: int) -> None:
     torch.manual_seed(seed)
 
 
+def _answer_latency(answer: Answer | None) -> dict[str, float]:
+    if answer is None:
+        return {}
+    return {
+        "generation": answer.latency_ms.get("generation", 0.0),
+        "answer_total": answer.latency_ms["total"],
+    }
+
+
+def answer_record(answer: Answer, q: Question) -> dict[str, Any]:
+    cited = {c.article_id for c in answer.citations if c.article_id}
+    return {
+        "text": answer.answer,
+        "refused": answer.refused,
+        "refusal_reason": answer.refusal_reason,
+        "citations": [
+            {"n": c.n, "chunk_id": c.chunk_id, "article_id": c.article_id} for c in answer.citations
+        ],
+        "invalid_citations": answer.invalid_citations,
+        # did the answer cite at least one gold article?
+        "cites_gold": bool(cited & set(q.gold_article_ids)) if q.in_scope else None,
+    }
+
+
+def _share(values: Sequence[bool]) -> float | None:
+    return round(sum(values) / len(values), 4) if values else None
+
+
+def generation_metrics(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    answered = [r for r in rows if r.get("answer")]
+    in_scope = [r for r in answered if r["type"] != "out_of_scope"]
+    out_scope = [r for r in answered if r["type"] == "out_of_scope"]
+    replied = [r for r in answered if not r["answer"]["refused"]]
+    valid = sum(len(r["answer"]["citations"]) for r in replied)
+    invalid = sum(len(r["answer"]["invalid_citations"]) for r in replied)
+    grades = [r["grade"] for r in replied if r.get("grade")]
+    in_scope_grades = [
+        r["grade"] for r in replied if r.get("grade") and r["type"] != "out_of_scope"
+    ]
+
+    def avg(key: str, gs: Sequence[dict[str, Any]]) -> float | None:
+        value = mean([float(g[key]) for g in gs])
+        return round(value, 3) if value is not None else None
+
+    return {
+        "n": len(answered),
+        "refusal_accuracy_out_of_scope": _share([r["answer"]["refused"] for r in out_scope]),
+        "false_refusal_rate_in_scope": _share([r["answer"]["refused"] for r in in_scope]),
+        "refused_low_evidence": sum(
+            r["answer"]["refusal_reason"] == "low_evidence" for r in answered
+        ),
+        "refused_by_model": sum(r["answer"]["refusal_reason"] == "model" for r in answered),
+        "citation_validity": round(valid / (valid + invalid), 4) if valid + invalid else None,
+        "answers_with_citation": _share([bool(r["answer"]["citations"]) for r in replied]),
+        "cites_gold": _share(
+            [r["answer"]["cites_gold"] for r in replied if r["type"] != "out_of_scope"]
+        ),
+        "faithfulness_mean": avg("faithfulness", grades),
+        "faithful_share": _share([g["faithfulness"] >= 4 for g in grades]),
+        "relevance_mean": avg("relevance", in_scope_grades),
+        "judged": len(grades),
+        "judge_failures": sum(1 for r in replied if "grade" in r and r["grade"] is None),
+    }
+
+
 def run_experiment(
     experiment: ExperimentConfig,
     ingest: IngestConfig,
@@ -111,13 +181,18 @@ def run_experiment(
     limit: int | None = None,
     seed: int = 42,
     progress: Callable[[int, int], None] | None = None,
+    generator: AnswerGenerator | None = None,
+    judge: Judge | None = None,
 ) -> dict[str, Any]:
     selected = select_questions(questions, split, include_pending=include_pending)
     if limit is not None:
         selected = selected[:limit]
     rows: list[dict[str, Any]] = []
+    answers: list[Answer | None] = []
     for i, q in enumerate(selected, start=1):
-        result = pipeline.run(q.question)
+        answer = generator.answer(q.question) if generator else None
+        result = answer.retrieval if answer else pipeline.run(q.question)
+        answers.append(answer)
         retrieved = [h.chunk.article_id for h in result.hits]
         rows.append(
             {
@@ -139,11 +214,19 @@ def run_experiment(
                 "support": [h.chunk.chunk_id for h in result.support],
                 "top_score": result.hits[0].score if result.hits else None,
                 "metrics": score_question(q, retrieved) if q.in_scope else None,
-                "latency_ms": result.latency_ms,
+                "latency_ms": {**result.latency_ms, **_answer_latency(answer)},
+                "answer": answer_record(answer, q) if answer else None,
             }
         )
         if progress:
             progress(i, len(selected))
+
+    if judge is not None:
+        # second pass, so Ollama does not swap the answer and judge models for every question
+        for row, answer in zip(rows, answers, strict=True):
+            if answer is not None and not answer.refused:
+                grade = judge.grade(answer.question, answer.answer, answer.passages)
+                row["grade"] = asdict(grade) if grade else None
 
     in_scope = [r for r in rows if r["type"] != "out_of_scope"]
     types = sorted({r["type"] for r in in_scope})
@@ -202,6 +285,7 @@ def run_experiment(
             ),
         },
         "latency_ms": latency_summary(rows),
+        "generation": generation_metrics(rows) if generator else None,
         "questions": rows,
     }
 
@@ -235,7 +319,46 @@ def format_summary(results: dict[str, Any]) -> list[str]:
     total = results["latency_ms"].get("total", {})
     if total:
         lines.append(f"latency total: p50 {total['p50']:.0f} ms, p95 {total['p95']:.0f} ms")
+    gen = results.get("generation")
+    if gen:
+        lines.append("generation: " + ", ".join(f"{k}={v}" for k, v in gen.items()))
     return lines
+
+
+def _ollama(model: str, gen: GenerationConfig) -> OllamaClient:
+    settings = get_settings()
+    client = OllamaClient(
+        settings.ollama_base_url,
+        model,
+        seed=settings.random_seed,
+        num_gpu=gen.gpu_layers,
+        timeout_seconds=gen.timeout_seconds,
+    )
+    if not client.has_model():
+        raise ConfigError(f"Ollama model {model} is not installed. Run `ollama pull {model}`.")
+    return client
+
+
+def build_generation(
+    experiment: ExperimentConfig, pipeline: RetrievalPipeline
+) -> tuple[AnswerGenerator | None, Judge | None]:
+    gen = experiment.generation
+    if not gen.enabled:
+        return None, None
+    settings = get_settings()
+    model = gen.model or settings.llm_model
+    generator = AnswerGenerator(
+        pipeline, _ollama(model, gen), context_k=gen.context_k, threshold=gen.threshold
+    )
+    if not gen.judge:
+        return generator, None
+    judge_model = gen.judge_model or settings.judge_model
+    if not judge_model:
+        raise ConfigError("Set generation.judge_model or JUDGE_MODEL, or turn the judge off.")
+    if judge_model == model:
+        raise ConfigError("The judge must be a different model from the one that answers.")
+    # the judge runs after all answers, so it can use the GPU
+    return generator, Judge(_ollama(judge_model, gen.model_copy(update={"gpu_layers": None})))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -268,7 +391,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     set_seeds(settings.random_seed)
-    pipeline = build_pipeline(experiment.retrieval, ingest)
+    try:
+        pipeline = build_pipeline(experiment.retrieval, ingest)
+        generator, judge = build_generation(experiment, pipeline)
+    except ConfigError as exc:
+        print(exc, file=sys.stderr)
+        return 1
 
     def progress(i: int, n: int) -> None:
         print(f"\r{i}/{n} questions", end="", file=sys.stderr, flush=True)
@@ -283,6 +411,8 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
         seed=settings.random_seed,
         progress=progress,
+        generator=generator,
+        judge=judge,
     )
     print(file=sys.stderr)
     run_dir = save_run(results, args.runs_dir or settings.runs_dir)
