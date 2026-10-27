@@ -113,3 +113,30 @@ Runs `20261027-035624_e7_generation_dev` and `20261027-035736_e7_threshold_dev`.
   is faithful: mistral does not separate good from weak answers here. The human check of 20
   answers (SPEC.md section 10) is the real test of faithfulness, and a stricter judge is
   future work.
+
+## Human check of 20 answers (dev, `e7_generation`)
+
+20 answered in-scope questions, sampled with a fixed seed and reviewed by hand in
+`data/eval/answer_review.csv`. Made with `python -m eurolex.evaluation.answer_review summary`:
+
+| | yes | partly | no |
+|---|---|---|---|
+| Answer correct | 15 | 5 | 0 |
+| Citations correct (every cited passage supports its claim) | 12 | - | 8 |
+
+11 of 20 answers were right on both counts. No answer was plainly wrong, but:
+
+- **Citations are the weak spot.** Citation validity is 1.000 because it only checks that a
+  marker points at a passage the model was given. Humans found a wrong or irrelevant
+  passage in 8 of 20 answers, usually an extra one next to a correct one (e.g. Art. 66
+  cited for the one-month deadline, Art. 47 cited for restriction of processing), or the
+  right rule cited to a neighbouring article (Art. 13/15 for Art. 14 content).
+- **Partly correct answers leave things out:** exceptions (Art. 9(2) for employee data),
+  the most relevant ground (Art. 18(1)(d) during a dispute) or parts of a list (Art. 28(3),
+  Art. 14). One answer (q-0126) added a sentence that no passage supports.
+- **The judge missed all of this.** It scored these 20 answers 5/5 for faithfulness,
+  including q-0126. So judge scores are not used as evidence of faithfulness in this project.
+
+Ideas for later, each needing its own evaluation: a check that every cited passage shares
+key terms with its sentence, a stricter judge prompt that grades one claim at a time, and
+giving fewer passages so there is less to cite wrongly.
