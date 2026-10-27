@@ -15,12 +15,14 @@ status, never the question.
 
 ## Contract
 
-`POST /ask` and `GET /health` follow SPEC.md section 6. Two small choices:
+`POST /ask` and `GET /health` follow SPEC.md section 6. Some small choices:
 
 - Cited recitals have no article id. They get their chunk id (e.g. `gdpr:rct-85`) as
   `article_id` and "Recital 85" as `article_title`, so the field is never empty.
 - `latency_ms.rerank` is 0, because the served pipeline has no reranker (ADR 008).
-- The EUR-Lex link is the whole act, not the article: our source URL is per act.
+- The EUR-Lex link jumps to the cited article or recital (`#art_33`, `#rct_85`). The stored
+  source URL is per act, so the API adds the anchor; checked on the live EUR-Lex page
+  (2026-10-27), which uses the same ids as the CELLAR copy we ingest.
 
 `POST /feedback` (a stretch goal) is not built.
 

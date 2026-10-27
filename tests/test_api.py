@@ -219,7 +219,7 @@ def test_recital_citation_gets_an_id_and_title() -> None:
         chapter=None,
         recital_number="85",
         text="A breach may cause damage.",
-        source_url="https://example.test",
+        source_url="https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679",
         char_count=26,
     )
     answer = Answer(
@@ -243,4 +243,16 @@ def test_recital_citation_gets_an_id_and_title() -> None:
     out = to_response(answer)
     assert out.citations[0].article_id == "gdpr:rct-85"
     assert out.citations[0].article_title == "Recital 85"
+    assert out.citations[0].url.endswith("CELEX:32016R0679#rct_85")
     assert out.latency_ms.model_dump() == {"retrieval": 1, "rerank": 0, "generation": 3}
+
+
+def test_deep_link_to_article() -> None:
+    from eurolex.api.main import deep_link
+
+    act = "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679"
+    article = CHUNKS[0].model_copy(update={"article_number": "33", "source_url": act})
+    assert deep_link(act, article) == act + "#art_33"
+    assert deep_link(act + "#x", article) == act + "#x"  # already has an anchor
+    assert deep_link("https://example.test", article) == "https://example.test"  # not EUR-Lex
+    assert deep_link(act, None) == act

@@ -18,7 +18,7 @@ from eurolex.api.ratelimit import RateLimiter
 from eurolex.config import Settings, get_settings, load_experiment_config, load_ingest_config
 from eurolex.generation.llm import LLMError
 from eurolex.generation.prompts import DISCLAIMER
-from eurolex.schemas import Answer
+from eurolex.schemas import Answer, Chunk
 
 VERSION = version("eurolex-rag")
 
@@ -66,6 +66,17 @@ class Health(BaseModel):
     version: str
 
 
+def deep_link(url: str, chunk: Chunk | None) -> str:
+    """Jump to the article or recital. EUR-Lex pages use ids like art_33 and rct_85."""
+    if chunk is None or "#" in url or "eur-lex.europa.eu" not in url:
+        return url
+    if chunk.article_number:
+        return f"{url}#art_{chunk.article_number}"
+    if chunk.recital_number:
+        return f"{url}#rct_{chunk.recital_number}"
+    return url
+
+
 def to_response(answer: Answer) -> AskResponse:
     chunks = {p.chunk.chunk_id: p.chunk for p in answer.passages}
     citations = []
@@ -79,7 +90,7 @@ def to_response(answer: Answer) -> AskResponse:
                 article_id=c.article_id or c.chunk_id,
                 article_title=c.article_title or (f"Recital {recital}" if recital else ""),
                 text=c.text,
-                url=c.url,
+                url=deep_link(c.url, chunk),
             )
         )
     lat = answer.latency_ms
