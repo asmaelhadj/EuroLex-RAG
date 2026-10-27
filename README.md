@@ -37,15 +37,84 @@ on a fixed, reviewed question set.
 
 ## Architecture
 
+**Overview**
+
 ```mermaid
 flowchart LR
-    Q["Question"] --> API["FastAPI<br/>auth, limits"]
-    API --> R["BGE-M3 dense search<br/>(articles first,<br/>recitals as support)"]
-    R --> T{"top score<br/>≥ threshold?"}
-    T -- no --> X["refuse, no LLM call"]
-    T -- yes --> L["qwen2.5:7b via Ollama<br/>passages as untrusted data"]
-    L --> C["citation check,<br/>disclaimer"]
-    C --> A["answer + sources"]
+    DOC["Official GDPR text<br/>(EU Publications Office)"] --> ING["Ingestion pipeline<br/>parse, chunk, embed"]
+    ING --> QD[("Qdrant<br/>dense + sparse vectors")]
+    USER["User"] --> UI["Streamlit UI"] --> API["FastAPI"]
+    API --> SE["Retrieval + refusal check"]
+    QD --> SE
+    SE --> LLM["Local LLM<br/>(Ollama)"]
+    LLM --> RESP["Answer with<br/>cited articles"]
+    RESP --> UI
+    QD --> EVAL["Evaluation harness<br/>E0–E7"] --> RES["docs/results.md"]
+```
+
+**1. Ingestion** (`make ingest`, run once)
+
+```mermaid
+flowchart TB
+    D1["Download GDPR from CELLAR"] --> D2{"Raw file<br/>already on disk?"}
+    D2 -- "no" --> D3["Fetch XHTML,<br/>record SHA-256 in manifest"] --> P1
+    D2 -- "yes" --> P1["Parse articles<br/>and recitals"]
+    P1 --> C1["Article-aware chunks<br/>(paragraph split when long)"]
+    P1 --> C2["Fixed-size chunks<br/>(E0 baseline)"]
+    C1 --> E1["Embed with BGE-M3<br/>dense + sparse"]
+    C2 --> E1
+    E1 --> I1{"Chunk text and model<br/>unchanged?"}
+    I1 -- "yes" --> SKIP["Skip"]
+    I1 -- "no" --> QD[("Qdrant<br/>eurolex_article / eurolex_fixed")]
+
+    classDef ingest fill:#dbe7f6,stroke:#5b7fb0,color:#1d1b2c
+    class D1,D3,P1,C1,C2,E1,SKIP ingest
+```
+
+**2. Answering a question** (`POST /ask`)
+
+```mermaid
+flowchart TB
+    USER(["User"]) --> UI["Streamlit UI"]
+    UI -- "POST /ask" --> A1{"Valid X-API-Key?"}
+    A1 -- "no" --> R401["401"]
+    A1 -- "yes" --> A2{"1–500 characters?"}
+    A2 -- "no" --> R422["422"]
+    A2 -- "yes" --> A3{"Under rate limit?"}
+    A3 -- "no" --> R429["429"]
+    A3 -- "yes" --> Q1["Embed question<br/>BGE-M3 on CPU"]
+    Q1 --> Q2["Dense search in Qdrant:<br/>top 10 articles + 3 best recitals"]
+    Q2 --> T1{"Top score<br/>≥ 0.5003?"}
+    T1 -- "no" --> REF["Fixed refusal<br/>(no LLM call)"]
+    T1 -- "yes" --> G1["Prompt: 8 articles + 3 recitals<br/>as numbered, untrusted data blocks"]
+    G1 --> G2["qwen2.5:7b-instruct<br/>via Ollama"]
+    G2 --> G3{"Model says it<br/>cannot answer?"}
+    G3 -- "yes" --> REF
+    G3 -- "no" --> G4["Remove citations to passages<br/>that were not given"]
+    G4 --> G5["Cut text after the disclaimer,<br/>add it if missing"]
+    G5 --> OUT["Answer + sources<br/>(text, score, EUR-Lex link)"]
+    REF --> OUT
+    OUT --> UI
+    OUT -. "hash, length, scores,<br/>tokens, latency" .-> LOG["JSON logs<br/>(question text not logged)"]
+
+    classDef gen fill:#dcefdc,stroke:#5c9a5c,color:#1d1b2c
+    classDef stop fill:#fbe3e3,stroke:#c25757,color:#1d1b2c
+    class G1,G2,G4,G5 gen
+    class R401,R422,R429,REF stop
+```
+
+**3. Evaluation** (`make eval`, `make report`)
+
+```mermaid
+flowchart LR
+    V1["Validated questions<br/>dev / test split"] --> V2["Experiment config<br/>E0–E7"]
+    QD[("Qdrant")] --> V2
+    V2 --> V3["Recall@k, MRR, nDCG@10,<br/>refusals, citations, judge"]
+    V3 --> V4["runs/&lt;id&gt;/summary.json<br/>(config, commit, seed)"]
+    V4 --> V5["docs/results.md"]
+
+    classDef eval fill:#ece6fa,stroke:#7d6bc2,color:#1d1b2c
+    class V1,V2,V3,V4,V5 eval
 ```
 
 Offline, `make ingest` downloads the GDPR, parses articles and recitals, cuts article-aware
