@@ -40,14 +40,14 @@ on a fixed, reviewed question set.
 **Overview**
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph OFF["Offline: make ingest"]
         direction LR
         DOC["Official GDPR text<br/>(EU Publications Office)"] --> ING["Parse, chunk,<br/>embed (BGE-M3)"] --> QD[("Qdrant<br/>vector store")]
     end
     subgraph ON["Per question"]
         direction LR
-        USER(["User"]) --> UI["Streamlit UI"] --> API["FastAPI"] --> SE["Search +<br/>evidence check"] --> LLM["Local LLM<br/>(Ollama)"] --> RESP["Answer with<br/>cited articles"]
+        UI["User → Streamlit UI"] --> API["FastAPI"] --> SE["Search +<br/>evidence check"] --> LLM["Local LLM<br/>(Ollama)"] --> RESP["Answer with<br/>cited articles"]
     end
     QD --> SE
 ```
