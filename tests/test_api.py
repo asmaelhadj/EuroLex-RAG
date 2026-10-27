@@ -16,7 +16,8 @@ from eurolex.generation.answer import AnswerGenerator
 from eurolex.ingestion.__main__ import write_jsonl
 from eurolex.ingestion.index import ensure_collection, sync_collection
 from eurolex.retrieval.pipeline import build_pipeline
-from eurolex.ui.client import ask
+from eurolex.ui.client import ask, is_up
+from eurolex.ui.render import answer_html, seconds
 from tests.fakes import FakeEmbedder
 from tests.test_llm import FakeLLM
 from tests.test_pipeline import CHUNKS, ROOT, config
@@ -94,8 +95,11 @@ def test_ask_returns_answer_with_citations(api: TestClient, llm: FakeLLM) -> Non
             "article_title": "t",
             "text": "alpha bravo charlie",
             "url": "https://example.test",
+            "score": body["citations"][0]["score"],
         }
     ]
+    assert 0 < body["citations"][0]["score"] <= 1
+    assert body["passages"] == 3
     assert set(body["latency_ms"]) == {"retrieval", "rerank", "generation"}
     assert "alpha bravo" in llm.prompts[0]
 
@@ -256,3 +260,41 @@ def test_deep_link_to_article() -> None:
     assert deep_link(act + "#x", article) == act + "#x"  # already has an anchor
     assert deep_link("https://example.test", article) == "https://example.test"  # not EUR-Lex
     assert deep_link(act, None) == act
+
+
+def test_ui_client_reads_stats_and_health(api: TestClient) -> None:
+    reply = ask("alpha bravo", api_url="http://testserver", api_key=KEY, client=api)
+    assert reply.passages == 3
+    assert set(reply.latency_ms) == {"retrieval", "rerank", "generation"}
+    assert is_up("http://testserver", client=api)
+
+
+def test_is_up_when_api_is_down() -> None:
+    def refuse(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused")
+
+    assert not is_up("http://x.test", client=httpx.Client(transport=httpx.MockTransport(refuse)))
+
+
+def test_answer_html_escapes_and_marks_citations() -> None:
+    out = answer_html(
+        'Use a contract [1][2]. <script>alert("x")</script> ![t](http://evil.test/p.png)'
+    )
+    assert '<span class="cite">1</span><span class="cite">2</span>' in out
+    assert "<script>" not in out
+    assert "&lt;script&gt;" in out
+    assert "evil.test" not in out
+
+
+def test_seconds() -> None:
+    assert seconds(58507) == "58.5 s"
+    assert seconds(42) == "42 ms"
+
+
+def test_ui_client_timeout_message() -> None:
+    def slow(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow")
+
+    http = httpx.Client(transport=httpx.MockTransport(slow))
+    reply = ask("q", api_url="http://x.test", api_key=KEY, client=http)
+    assert "too long" in reply.error

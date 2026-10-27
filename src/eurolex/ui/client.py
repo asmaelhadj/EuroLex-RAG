@@ -12,6 +12,8 @@ class Reply:
     answer: str = ""
     refused: bool = False
     citations: list[dict[str, Any]] = field(default_factory=list)
+    latency_ms: dict[str, int] = field(default_factory=dict)
+    passages: int = 0
     error: str = ""
 
 
@@ -38,6 +40,8 @@ def ask(
             json={"question": question, "filters": {"act_id": None}},
             headers={"X-API-Key": api_key},
         )
+    except httpx.TimeoutException:
+        return Reply(ok=False, error="The API took too long to answer. It may be busy; try again.")
     except httpx.HTTPError:
         return Reply(ok=False, error=f"Could not reach the API at {api_url}. Is it running?")
     finally:
@@ -51,5 +55,22 @@ def ask(
         return Reply(ok=False, error=message)
     body = response.json()
     return Reply(
-        ok=True, answer=body["answer"], refused=body["refused"], citations=body["citations"]
+        ok=True,
+        answer=body["answer"],
+        refused=body["refused"],
+        citations=body["citations"],
+        latency_ms=body.get("latency_ms", {}),
+        passages=body.get("passages", 0),
     )
+
+
+def is_up(api_url: str, *, client: httpx.Client | None = None) -> bool:
+    http = client or httpx.Client(timeout=3)
+    try:
+        response = http.get(f"{api_url.rstrip('/')}/health")
+        return response.status_code == 200 and response.json().get("status") == "ok"
+    except (httpx.HTTPError, ValueError):
+        return False
+    finally:
+        if client is None:
+            http.close()
