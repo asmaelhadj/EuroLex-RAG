@@ -1,6 +1,6 @@
 # One image for the API and the UI. CPU-only PyTorch (the Linux index in pyproject.toml);
 # the LLM runs in Ollama outside this image.
-FROM python:3.12.7-slim-bookworm
+FROM python:3.15.0-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:0.10.0 /uv /usr/local/bin/uv
 
