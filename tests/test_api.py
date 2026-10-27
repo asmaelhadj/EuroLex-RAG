@@ -1,5 +1,8 @@
 """API integration tests: real pipeline over a tiny in-memory index, mocked LLM."""
 
+import json
+import logging
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -15,7 +18,9 @@ from eurolex.config import ConfigError, IngestConfig, Settings, load_ingest_conf
 from eurolex.generation.answer import AnswerGenerator
 from eurolex.ingestion.__main__ import write_jsonl
 from eurolex.ingestion.index import ensure_collection, sync_collection
+from eurolex.observability import JsonFormatter, question_fields
 from eurolex.retrieval.pipeline import build_pipeline
+from eurolex.tracing import LangfuseTracer, NoTracer, build_tracer
 from eurolex.ui.client import ask, is_up
 from eurolex.ui.render import answer_html, seconds
 from tests.fakes import FakeEmbedder
@@ -298,3 +303,99 @@ def test_ui_client_timeout_message() -> None:
     http = httpx.Client(transport=httpx.MockTransport(slow))
     reply = ask("q", api_url="http://x.test", api_key=KEY, client=http)
     assert "too long" in reply.error
+
+
+class RecordingTracer:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str | None, dict[str, Any], dict[str, Any]]] = []
+
+    def trace(self, question: str | None, ids: dict[str, Any], fields: dict[str, Any]) -> None:
+        self.calls.append((question, ids, fields))
+
+
+def test_ask_is_logged_without_the_question(
+    ingest: IngestConfig, client: QdrantClient, llm: FakeLLM, caplog: pytest.LogCaptureFixture
+) -> None:
+    tracer = RecordingTracer()
+    app = create_app(settings(), lambda s: generator(ingest, client, llm), tracer)
+    with caplog.at_level(logging.INFO, logger="eurolex.api"), TestClient(app) as api:
+        post(api, "alpha bravo secret-name")
+    record = next(r for r in caplog.records if r.getMessage() == "ask")
+    line = JsonFormatter().format(record)
+    assert "secret-name" not in line
+    entry = json.loads(line)
+    assert entry["question_chars"] == len("alpha bravo secret-name")
+    assert len(entry["question_sha256"]) == 16
+    assert entry["refused"] is False
+    assert entry["top_score"] > 0
+    assert "retrieval" in entry["latency_ms"]
+    question, ids, fields = tracer.calls[0]
+    assert question is None
+    assert "question" not in ids
+    assert fields["citations"] == [1]
+
+
+def test_log_queries_flag_includes_the_question(
+    ingest: IngestConfig, client: QdrantClient, llm: FakeLLM, caplog: pytest.LogCaptureFixture
+) -> None:
+    tracer = RecordingTracer()
+    app = create_app(settings(log_queries=True), lambda s: generator(ingest, client, llm), tracer)
+    with caplog.at_level(logging.INFO, logger="eurolex.api"), TestClient(app) as api:
+        post(api, "alpha bravo")
+    record = next(r for r in caplog.records if r.getMessage() == "ask")
+    assert json.loads(JsonFormatter().format(record))["question"] == "alpha bravo"
+    assert tracer.calls[0][0] == "alpha bravo"
+
+
+def test_llm_failure_is_logged(
+    ingest: IngestConfig, client: QdrantClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    app = create_app(settings(), lambda s: generator(ingest, client, FakeLLM(None)), NoTracer())
+    with caplog.at_level(logging.INFO, logger="eurolex.api"), TestClient(app) as api:
+        post(api, "alpha")
+    assert any(r.getMessage() == "ask_failed" for r in caplog.records)
+
+
+def test_question_fields_hash_is_stable() -> None:
+    a = question_fields("Same question?", log_queries=False)
+    assert a == question_fields("Same question?", log_queries=False)
+    assert a != question_fields("Other question?", log_queries=False)
+    assert "question" not in a
+
+
+def test_tracing_is_off_by_default_and_needs_the_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert isinstance(build_tracer(settings()), NoTracer)
+    monkeypatch.setitem(sys.modules, "langfuse", None)  # import fails as if not installed
+    with pytest.raises(ConfigError, match="extra tracing"):
+        build_tracer(settings(langfuse_enabled=True))
+
+
+def test_langfuse_tracer_sends_one_observation() -> None:
+    class Span:
+        ended = False
+
+        def end(self) -> None:
+            self.ended = True
+
+    class Client:
+        def __init__(self) -> None:
+            self.kwargs: dict[str, Any] = {}
+            self.span = Span()
+
+        def start_observation(self, **kwargs: Any) -> Span:
+            self.kwargs = kwargs
+            return self.span
+
+    fake = Client()
+    LangfuseTracer(fake).trace(None, {"question_chars": 5}, {"refused": True, "citations": []})
+    assert fake.kwargs["name"] == "ask"
+    assert fake.kwargs["input"] is None
+    assert fake.kwargs["metadata"]["question_chars"] == 5
+    assert fake.span.ended
+
+
+def test_num_predict_option() -> None:
+    from eurolex.generation.llm import OllamaClient
+
+    client = OllamaClient("http://o.test", "m", num_predict=1024)
+    assert client.options_for()["num_predict"] == 1024

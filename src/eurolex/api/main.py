@@ -4,7 +4,9 @@ Run with `make api`. The answerer is built from `settings.api_config`, the confi
 in docs/results.md. Tests pass their own answerer (tiny index, mocked LLM) to `create_app`.
 """
 
+import logging
 import threading
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import version
@@ -18,9 +20,12 @@ from eurolex.api.ratelimit import RateLimiter
 from eurolex.config import Settings, get_settings, load_experiment_config, load_ingest_config
 from eurolex.generation.llm import LLMError
 from eurolex.generation.prompts import DISCLAIMER
+from eurolex.observability import configure_logging, question_fields
 from eurolex.schemas import Answer, Chunk
+from eurolex.tracing import Tracer, build_tracer
 
 VERSION = version("eurolex-rag")
+logger = logging.getLogger("eurolex.api")
 
 DESCRIPTION = (
     f"Questions about EU law (GDPR), answered from the official text with citations. {DISCLAIMER}"
@@ -112,6 +117,22 @@ def to_response(answer: Answer) -> AskResponse:
     )
 
 
+def log_fields(answer: Answer, queue_ms: float) -> dict[str, object]:
+    """What goes into the log line and the trace: numbers only, no text."""
+    hits = answer.retrieval.hits
+    return {
+        "refused": answer.refused,
+        "refusal_reason": answer.refusal_reason,
+        "top_score": round(hits[0].score, 4) if hits else None,
+        "scores": [round(h.score, 4) for h in hits[:5]],
+        "citations": [c.n for c in answer.citations],
+        "invalid_citations": answer.invalid_citations,
+        "prompt_tokens": answer.prompt_tokens,
+        "latency_ms": {k: round(v) for k, v in answer.latency_ms.items()},
+        "queue_ms": round(queue_ms),
+    }
+
+
 def build_answerer(settings: Settings) -> Answerer:
     """Load the evaluated pipeline. Imported here so tests never load models."""
     from eurolex.generation.answer import AnswerGenerator
@@ -129,7 +150,9 @@ def build_answerer(settings: Settings) -> Answerer:
         seed=settings.random_seed,
         num_gpu=gen.gpu_layers,
         num_ctx=gen.num_ctx,
-        timeout_seconds=gen.timeout_seconds,
+        num_predict=settings.api_max_answer_tokens,
+        timeout_seconds=settings.api_llm_timeout_seconds,
+        retries=1,
     )
     return AnswerGenerator(pipeline, llm, context_k=gen.context_k, threshold=gen.threshold)
 
@@ -137,9 +160,11 @@ def build_answerer(settings: Settings) -> Answerer:
 def create_app(
     settings: Settings | None = None,
     answerer_factory: Callable[[Settings], Answerer] = build_answerer,
+    tracer: Tracer | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     api_key = settings.require_api_key().get_secret_value()
+    tracer = tracer or build_tracer(settings)
     limiter = RateLimiter(settings.rate_limit_per_minute)
     # one question at a time: the models share one GPU and are not thread-safe
     lock = threading.Lock()
@@ -182,13 +207,20 @@ def create_app(
                 "Too many questions, try again shortly.",
                 headers={"Retry-After": str(max(1, round(wait)))},
             )
+        ids = question_fields(question, settings.log_queries)
+        start = time.perf_counter()
         with lock:
+            queue_ms = (time.perf_counter() - start) * 1000
             try:
                 answer = state["answerer"].answer(question, act_id=body.filters.act_id)
             except LLMError as exc:
+                logger.warning("ask_failed", extra={**ids, "error": str(exc)})
                 raise HTTPException(
                     status.HTTP_503_SERVICE_UNAVAILABLE, "The language model is not available."
                 ) from exc
+        fields = log_fields(answer, queue_ms)
+        logger.info("ask", extra={**ids, **fields})
+        tracer.trace(question if settings.log_queries else None, ids, fields)
         return to_response(answer)
 
     return app
@@ -196,4 +228,6 @@ def create_app(
 
 def app() -> FastAPI:
     """For `uvicorn --factory eurolex.api.main:app`, so importing this module reads no env."""
-    return create_app()
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    return create_app(settings)

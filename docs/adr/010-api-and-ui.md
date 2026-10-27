@@ -62,3 +62,25 @@ history is kept only in the browser session.
 fake embedder and a mocked LLM: auth, length limits, rate limit, threshold refusal, LLM
 failure, OpenAPI docs, and the UI client against the API. Docker Compose for the API and UI
 is Phase 7.
+
+## Logging, tracing and timeouts (Phase 7)
+
+- One JSON log line per question (`event: ask`): question hash (16 hex chars of SHA-256) and
+  length, top score and top-5 scores, refusal reason, cited and invalid citation numbers,
+  prompt tokens, latencies and time spent waiting for the lock. The text is only included
+  with `LOG_QUERIES=true`. A hash of a short common question can be guessed, so this is
+  pseudonymous, not anonymous.
+- Langfuse tracing is optional (`uv sync --extra tracing`, `LANGFUSE_ENABLED=true`). It
+  sends one observation per question with the same fields as the log line.
+- In manual testing one answer held the API for about ten minutes, so the API caps answers
+  at `API_MAX_ANSWER_TOKENS` (1024) and waits at most `API_LLM_TIMEOUT_SECONDS` (120 s) per
+  try, with one retry. The longest dev answer was about 2,200 characters (roughly 500
+  tokens), so the cap would not have changed any evaluated answer. Evaluation keeps its own
+  settings (no cap, 300 s), so the evaluated runs stay reproducible.
+
+## Docker
+
+One image (`Dockerfile`, CPU-only PyTorch) runs both the API and the UI; `make up` starts
+Qdrant, the API and the UI. Ports are bound to 127.0.0.1. The containers run as a non-root
+user, and BGE-M3 is downloaded into a named volume on first start. Ollama stays on the host
+by default (`host.docker.internal`), with an optional `ollama` Compose profile.
