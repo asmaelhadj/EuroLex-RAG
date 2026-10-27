@@ -41,14 +41,15 @@ on a fixed, reviewed question set.
 
 ```mermaid
 flowchart LR
-    DOC["Official GDPR text<br/>(EU Publications Office)"] --> ING["Ingestion pipeline<br/>parse, chunk, embed"]
-    ING --> QD[("Qdrant<br/>dense + sparse vectors")]
-    USER["User"] --> UI["Streamlit UI"] --> API["FastAPI"]
-    API --> SE["Retrieval + refusal check"]
+    subgraph OFF["Offline: make ingest"]
+        direction LR
+        DOC["Official GDPR text<br/>(EU Publications Office)"] --> ING["Parse, chunk,<br/>embed (BGE-M3)"] --> QD[("Qdrant<br/>vector store")]
+    end
+    subgraph ON["Per question"]
+        direction LR
+        USER(["User"]) --> UI["Streamlit UI"] --> API["FastAPI"] --> SE["Search +<br/>evidence check"] --> LLM["Local LLM<br/>(Ollama)"] --> RESP["Answer with<br/>cited articles"]
+    end
     QD --> SE
-    SE --> LLM["Local LLM<br/>(Ollama)"]
-    LLM --> RESP["Answer with<br/>cited articles"]
-    RESP --> UI
 ```
 
 **1. Ingestion** (`make ingest`, run once)
