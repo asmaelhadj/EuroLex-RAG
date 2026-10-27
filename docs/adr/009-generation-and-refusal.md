@@ -137,6 +137,23 @@ Runs `20261027-035624_e7_generation_dev` and `20261027-035736_e7_threshold_dev`.
 - **The judge missed all of this.** It scored these 20 answers 5/5 for faithfulness,
   including q-0126. So judge scores are not used as evidence of faithfulness in this project.
 
+## Test split (run once, 2026-10-27)
+
+Final pipeline (E1s retrieval, qwen answers, threshold 0.5003), runs
+`20261027-044905_e1s_articles_first_test` and `20261027-051913_e7_threshold_test`, commit
+cfdaddc. 22 questions: 13 in scope, 9 out of scope. Nothing was tuned on these results.
+
+- Retrieval: nDCG@10 0.793, R@1 0.577, R@10 0.923 (dev: 0.856, 0.711, 0.961). With 13
+  questions one question moves recall by about 8 points, so the gap is within noise.
+- Refusal: 9/9 out-of-scope refused, 0/13 in-scope refused. **The threshold alone caught
+  only 6 of 9**; q-0051 (CCPA, 0.534), q-0052 (AI systems, 0.634) and q-0061 (newsletter
+  frequency, 0.504) scored above it and were refused by the model. As expected from the
+  small dev margin, the threshold is a first filter, not the whole defence. These three are
+  near-miss questions that use GDPR-like words.
+- Every in-scope prompt fit the window (max 4,020 tokens).
+- Judge: 12 of 13 answers 5/5; q-0113 got 3 for the claim "processing can be based on
+  other lawful grounds as well". No human has checked the test answers.
+
 Ideas for later, each needing its own evaluation: a check that every cited passage shares
 key terms with its sentence, a stricter judge prompt that grades one claim at a time, and
 giving fewer passages so there is less to cite wrongly.
