@@ -49,7 +49,6 @@ flowchart LR
     SE --> LLM["Local LLM<br/>(Ollama)"]
     LLM --> RESP["Answer with<br/>cited articles"]
     RESP --> UI
-    QD --> EVAL["Evaluation harness<br/>E0–E7"] --> RES["docs/results.md"]
 ```
 
 **1. Ingestion** (`make ingest`, run once)
@@ -60,15 +59,13 @@ flowchart TB
     D2 -- "no" --> D3["Fetch XHTML,<br/>record SHA-256 in manifest"] --> P1
     D2 -- "yes" --> P1["Parse articles<br/>and recitals"]
     P1 --> C1["Article-aware chunks<br/>(paragraph split when long)"]
-    P1 --> C2["Fixed-size chunks<br/>(E0 baseline)"]
     C1 --> E1["Embed with BGE-M3<br/>dense + sparse"]
-    C2 --> E1
     E1 --> I1{"Chunk text and model<br/>unchanged?"}
     I1 -- "yes" --> SKIP["Skip"]
-    I1 -- "no" --> QD[("Qdrant<br/>eurolex_article / eurolex_fixed")]
+    I1 -- "no" --> QD[("Qdrant")]
 
     classDef ingest fill:#dbe7f6,stroke:#5b7fb0,color:#1d1b2c
-    class D1,D3,P1,C1,C2,E1,SKIP ingest
+    class D1,D3,P1,C1,E1,SKIP ingest
 ```
 
 **2. Answering a question** (`POST /ask`)
@@ -101,20 +98,6 @@ flowchart TB
     classDef stop fill:#fbe3e3,stroke:#c25757,color:#1d1b2c
     class G1,G2,G4,G5 gen
     class R401,R422,R429,REF stop
-```
-
-**3. Evaluation** (`make eval`, `make report`)
-
-```mermaid
-flowchart LR
-    V1["Validated questions<br/>dev / test split"] --> V2["Experiment config<br/>E0–E7"]
-    QD[("Qdrant")] --> V2
-    V2 --> V3["Recall@k, MRR, nDCG@10,<br/>refusals, citations, judge"]
-    V3 --> V4["runs/&lt;id&gt;/summary.json<br/>(config, commit, seed)"]
-    V4 --> V5["docs/results.md"]
-
-    classDef eval fill:#ece6fa,stroke:#7d6bc2,color:#1d1b2c
-    class V1,V2,V3,V4,V5 eval
 ```
 
 Offline, `make ingest` downloads the GDPR, parses articles and recitals, cuts article-aware
