@@ -76,3 +76,40 @@ Refusal accuracy on out-of-scope questions, false refusal rate on in-scope ones,
 validity (valid markers / all markers), share of in-scope answers that cite a gold article,
 and judge scores for faithfulness and relevance (1 to 5). E7 compares `e7_generation` (no
 threshold) with `e7_threshold`.
+
+## Ollama context window
+
+Ollama's default window is 4096 tokens and it drops the start of a longer prompt without an
+error. We set `num_ctx: 8192` and record the prompt token count of every answer; a run where
+any prompt fills the window is not reportable. In the E7 dev run prompts were 1,743 to 4,515
+tokens, and 4 of 75 were over 4096, so the default would have cut them.
+
+LLM calls are cached on disk (`runs/llm_cache.jsonl`, key = model, prompts, schema and
+options). Settings are temperature 0 with a fixed seed, so a stopped run resumes and the
+threshold run reuses the no-threshold run's calls. Its latency numbers are therefore cache
+reads, not model time.
+
+## E7 results (dev, 75 questions: 60 in scope, 15 out of scope)
+
+Runs `20261027-035624_e7_generation_dev` and `20261027-035736_e7_threshold_dev`.
+
+| | No threshold | Threshold 0.5003 |
+|---|---|---|
+| Out-of-scope refused | 15/15 (all by the model) | 15/15 (all by the threshold) |
+| In-scope refused (false refusals) | 2/60 | 2/60 |
+| Citation validity | 1.000 | 1.000 |
+| Answers with a citation | 56/58 | 56/58 |
+| Answers citing a gold article | 48/58 | 48/58 |
+| Judge faithfulness / relevance | 5.0 / 5.0 | 5.0 / 5.0 |
+
+- On dev the threshold changes no answer. It only refuses the 15 out-of-scope questions
+  before calling the model, which saves about 52 s each (p50 generation time on the GTX 1650).
+  qwen already refused all of them by itself, so on dev the threshold is a speed and safety
+  net, not an accuracy gain.
+- The 2 false refusals are model refusals. q-0114 (gold Art. 4) missed its gold article in
+  retrieval. q-0137 (gold Art. 77) had the gold article ranked first, so that one is the
+  model being too careful.
+- The judge gave 5/5 to all 58 answers. That is a ceiling effect, not proof that every answer
+  is faithful: mistral does not separate good from weak answers here. The human check of 20
+  answers (SPEC.md section 10) is the real test of faithfulness, and a stricter judge is
+  future work.

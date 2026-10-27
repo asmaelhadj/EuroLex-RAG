@@ -28,6 +28,8 @@ All in-scope questions:
 | e4_rerank | 60 | 0.425 | 0.819 | 0.903 | 0.628 | 0.685 | 14.5 s |
 | e4s_articles_first | 60 | 0.725 | 0.864 | 0.967 | 0.813 | 0.847 | 15.4 s |
 | e5_rewrite | 60 | 0.417 | 0.828 | 0.925 | 0.622 | 0.691 | 18.0 s |
+| e7_generation | 60 | 0.711 | 0.894 | 0.961 | 0.842 | 0.856 | 0.4 s |
+| e7_threshold | 60 | 0.711 | 0.894 | 0.961 | 0.842 | 0.856 | 0.3 s |
 
 Human-written / FAQ core only:
 
@@ -41,6 +43,8 @@ Human-written / FAQ core only:
 | e4_rerank | 18 | 0.417 | 0.833 | 0.889 | 0.617 | 0.676 |
 | e4s_articles_first | 18 | 0.750 | 0.833 | 0.889 | 0.804 | 0.820 |
 | e5_rewrite | 18 | 0.417 | 0.833 | 0.944 | 0.624 | 0.693 |
+| e7_generation | 18 | 0.639 | 0.889 | 0.944 | 0.744 | 0.792 |
+| e7_threshold | 18 | 0.639 | 0.889 | 0.944 | 0.744 | 0.792 |
 
 By question type (nDCG@10):
 
@@ -54,6 +58,15 @@ By question type (nDCG@10):
 | e4_rerank | 0.621 (n=3) | 0.728 (n=23) | 0.457 (n=8) | 0.797 (n=20) | 0.487 (n=6) |
 | e4s_articles_first | 0.833 (n=3) | 0.897 (n=23) | 0.650 (n=8) | 0.953 (n=20) | 0.572 (n=6) |
 | e5_rewrite | 0.621 (n=3) | 0.742 (n=23) | 0.508 (n=8) | 0.797 (n=20) | 0.417 (n=6) |
+| e7_generation | 0.667 (n=3) | 0.851 (n=23) | 0.758 (n=8) | 0.953 (n=20) | 0.782 (n=6) |
+| e7_threshold | 0.667 (n=3) | 0.851 (n=23) | 0.758 (n=8) | 0.953 (n=20) | 0.782 (n=6) |
+
+Generation (judge: see config; scores 1-5 from an LLM judge):
+
+| Experiment | Refusal acc. (out of scope) | False refusals (in scope) | Citation validity | Cites a gold article | Faithfulness (1-5) | Relevance (1-5) | judged |
+|---|---|---|---|---|---|---|---|
+| e7_generation | 1.000 | 0.033 | 1.000 | 0.828 | 5.000 | 5.000 | 58 |
+| e7_threshold | 1.000 | 0.033 | 1.000 | 0.828 | 5.000 | 5.000 | 58 |
 
 Runs used:
 
@@ -65,3 +78,5 @@ Runs used:
 - `20261026-193105_e4_rerank_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
 - `20261026-221116_e4s_articles_first_dev`: commit 09727b2d, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
 - `20261026-195453_e5_rewrite_dev`: commit 913487e9, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261027-035624_e7_generation_dev`: commit 99d5ca71, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
+- `20261027-035736_e7_threshold_dev`: commit 99d5ca71, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `30272fdd33a2`
