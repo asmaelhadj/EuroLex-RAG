@@ -78,7 +78,7 @@ services:
   #   docker compose exec ollama ollama pull qwen2.5:7b-instruct
   # Default is a host install (better GPU support on Windows/macOS); see docs/adr/001-stack.md.
   ollama:
-    image: ollama/ollama:0.40.8
+    image: ollama/ollama:0.40.11
     profiles: ["ollama"]
     ports:
       - "11434:11434"
