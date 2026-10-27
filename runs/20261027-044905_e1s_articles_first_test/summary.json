@@ -1,0 +1,190 @@
+{
+  "run_id": "20261027-044905_e1s_articles_first_test",
+  "experiment": "e1s_articles_first",
+  "description": "E1 with articles ranked alone; top recitals returned as support context",
+  "split": "test",
+  "timestamp": "2026-10-27T04:49:05+00:00",
+  "reportable": true,
+  "not_reportable_because": [],
+  "git": {
+    "commit": "0cf02c24dc26f6dbfad550959dc3ed5668e30f4c",
+    "dirty": false
+  },
+  "seed": 42,
+  "device": {
+    "torch": "2.14.1+cu126",
+    "python": "3.12.7",
+    "gpu": "NVIDIA GeForce GTX 1650 with Max-Q Design"
+  },
+  "config": {
+    "experiment": {
+      "name": "e1s_articles_first",
+      "description": "E1 with articles ranked alone; top recitals returned as support context",
+      "ingest_config": "configs\\ingest.yaml",
+      "retrieval": {
+        "collection": "eurolex_article",
+        "chunker": "article",
+        "retrievers": [
+          {
+            "type": "dense",
+            "top_k": 50,
+            "weight": 1.0
+          }
+        ],
+        "fusion": {
+          "k": 60
+        },
+        "rerank": {
+          "enabled": false,
+          "model": "BAAI/bge-reranker-v2-m3",
+          "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+          "candidates": 50,
+          "max_length": 1024,
+          "batch_size": 8,
+          "prepend_header": true,
+          "device": "auto",
+          "precision": "fp32"
+        },
+        "rewrite": {
+          "enabled": false,
+          "model": null,
+          "mode": "expand",
+          "gpu_layers": null
+        },
+        "top_k": 10,
+        "query_device": "cpu",
+        "recitals": "support",
+        "support_k": 3
+      },
+      "generation": {
+        "enabled": false,
+        "model": null,
+        "judge_model": null,
+        "judge": true,
+        "context_k": 8,
+        "threshold": null,
+        "gpu_layers": null,
+        "num_ctx": 8192,
+        "cache": true,
+        "timeout_seconds": 300.0
+      }
+    },
+    "embedding": {
+      "model": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "max_length": 1024,
+      "batch_size": 8,
+      "device": "auto",
+      "precision": "fp32"
+    },
+    "chunking": {
+      "article": {
+        "max_tokens": 512
+      },
+      "fixed": {
+        "size_tokens": 256,
+        "overlap_tokens": 32
+      }
+    }
+  },
+  "question_set": {
+    "sha256": "68a78747a7afeec4d7313d9be4943461f07c4c45608bea85c6fa1fa3f99ee1b5",
+    "n": 22,
+    "n_in_scope": 13,
+    "n_out_of_scope": 9,
+    "by_source": {
+      "faq": 4,
+      "llm_candidate": 18
+    }
+  },
+  "metrics": {
+    "all": {
+      "n": 13,
+      "recall@1": 0.5769,
+      "recall@3": 0.7692,
+      "recall@5": 0.8462,
+      "recall@10": 0.9231,
+      "mrr": 0.761,
+      "ndcg@10": 0.7934
+    },
+    "human_core": {
+      "n": 4,
+      "recall@1": 0.25,
+      "recall@3": 0.75,
+      "recall@5": 0.75,
+      "recall@10": 0.75,
+      "mrr": 0.625,
+      "ndcg@10": 0.6377
+    },
+    "by_type": {
+      "definition": {
+        "n": 1,
+        "recall@1": 0.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 0.5,
+        "ndcg@10": 0.6309
+      },
+      "factual": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "ndcg@10": 1.0
+      },
+      "multi_article": {
+        "n": 4,
+        "recall@1": 0.375,
+        "recall@3": 0.75,
+        "recall@5": 0.75,
+        "recall@10": 0.75,
+        "mrr": 0.75,
+        "ndcg@10": 0.7299
+      },
+      "obligation": {
+        "n": 2,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "ndcg@10": 1.0
+      },
+      "paraphrase": {
+        "n": 2,
+        "recall@1": 0.0,
+        "recall@3": 0.0,
+        "recall@5": 0.5,
+        "recall@10": 1.0,
+        "mrr": 0.1964,
+        "ndcg@10": 0.382
+      }
+    }
+  },
+  "out_of_scope_top_score": {
+    "mean": 0.4460985522222222
+  },
+  "latency_ms": {
+    "dense": {
+      "p50": 8.15,
+      "p95": 18.21
+    },
+    "embed_query": {
+      "p50": 265.63,
+      "p95": 371.97
+    },
+    "support": {
+      "p50": 11.71,
+      "p95": 18.73
+    },
+    "total": {
+      "p50": 277.83,
+      "p95": 390.56
+    }
+  },
+  "generation": null,
+  "llm_cache": {}
+}

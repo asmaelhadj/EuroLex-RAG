@@ -6,13 +6,43 @@ Retrieval metrics are article-level (see `src/eurolex/evaluation/metrics.py`); o
 ## Question set
 
 - dev: 75 questions (60 in scope, 15 out of scope); by source: faq: 18, llm_candidate: 57
-- test: TODO (no reportable runs)
+- test: 22 questions (13 in scope, 9 out of scope); by source: faq: 4, llm_candidate: 18
 - LLM candidates rejected in review: 39/114 (34%)
 - Annotators: TODO (fill in)
 
 ## Test split (final numbers)
 
-TODO: no reportable runs on the test split yet. Run `make eval CONFIG=configs/<experiment>.yaml SPLIT=test`.
+All in-scope questions:
+
+| Experiment | n | R@1 | R@5 | R@10 | MRR | nDCG@10 | p50 latency |
+|---|---|---|---|---|---|---|---|
+| e1s_articles_first | 13 | 0.577 | 0.846 | 0.923 | 0.761 | 0.793 | 0.3 s |
+| e7_threshold | 13 | 0.577 | 0.846 | 0.923 | 0.761 | 0.793 | 0.5 s |
+
+Human-written / FAQ core only:
+
+| Experiment | n | R@1 | R@5 | R@10 | MRR | nDCG@10 |
+|---|---|---|---|---|---|---|
+| e1s_articles_first | 4 | 0.250 | 0.750 | 0.750 | 0.625 | 0.638 |
+| e7_threshold | 4 | 0.250 | 0.750 | 0.750 | 0.625 | 0.638 |
+
+By question type (nDCG@10):
+
+| Experiment | definition | factual | multi_article | obligation | paraphrase |
+|---|---|---|---|---|---|
+| e1s_articles_first | 0.631 (n=1) | 1.000 (n=4) | 0.730 (n=4) | 1.000 (n=2) | 0.382 (n=2) |
+| e7_threshold | 0.631 (n=1) | 1.000 (n=4) | 0.730 (n=4) | 1.000 (n=2) | 0.382 (n=2) |
+
+Generation (judge: see config; scores 1-5 from an LLM judge):
+
+| Experiment | Refusal acc. (out of scope) | False refusals (in scope) | Citation validity | Cites a gold article | Faithfulness (1-5) | Relevance (1-5) | judged |
+|---|---|---|---|---|---|---|---|
+| e7_threshold | 1.000 | 0.000 | 1.000 | 0.769 | 4.846 | 5.000 | 13 |
+
+Runs used:
+
+- `20261027-044905_e1s_articles_first_test`: commit 0cf02c24, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `68a78747a7af`
+- `20261027-051913_e7_threshold_test`: commit 0cf02c24, NVIDIA GeForce GTX 1650 with Max-Q Design, question set `68a78747a7af`
 
 ## Dev split (used for tuning)
 
