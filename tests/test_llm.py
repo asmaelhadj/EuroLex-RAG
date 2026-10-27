@@ -162,3 +162,38 @@ def test_num_ctx_and_prompt_tokens_are_recorded() -> None:
     client.generate("hi")
     assert seen[0]["options"]["num_ctx"] == 8192  # type: ignore[index]
     assert client.last_prompt_tokens == 1234
+
+
+def test_cached_ollama_reuses_identical_calls(tmp_path: object) -> None:
+    from pathlib import Path
+
+    from eurolex.generation.cache import CachedOllama
+
+    calls: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={"response": f"reply {len(calls)}", "prompt_eval_count": 7})
+
+    path = Path(str(tmp_path)) / "cache.jsonl"
+    transport = httpx.MockTransport(handler)
+
+    def client() -> CachedOllama:
+        inner = OllamaClient(
+            "http://o.test", "m", num_ctx=8192, client=httpx.Client(transport=transport)
+        )
+        return CachedOllama(inner, path)
+
+    first = client()
+    assert first.generate("p", system="s") == "reply 1"
+    assert first.generate("p", system="s") == "reply 1"  # same call, from cache
+    assert first.generate("p", system="other") == "reply 2"  # different system prompt
+    assert first.generate("p", system="s", temperature=0.7) == "reply 3"  # different options
+    assert (first.hits, first.misses) == (1, 3)
+    assert first.last_prompt_tokens == 7
+
+    # a new process reads the cache from disk (resume)
+    second = client()
+    assert second.generate("p", system="s") == "reply 1"
+    assert (second.hits, second.misses, len(calls)) == (1, 0, 3)
+    assert second.last_prompt_tokens == 7
