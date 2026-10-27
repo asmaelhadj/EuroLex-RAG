@@ -70,6 +70,7 @@ class AnswerGenerator:
             citations=resolve(check.valid, passages),
             invalid_citations=check.invalid,
             passages=passages,
+            prompt_tokens=getattr(self._llm, "last_prompt_tokens", None),
             retrieval=retrieval,
             latency_ms=latency,
         )

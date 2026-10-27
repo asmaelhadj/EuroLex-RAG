@@ -124,6 +124,7 @@ def answer_record(answer: Answer, q: Question) -> dict[str, Any]:
             {"n": c.n, "chunk_id": c.chunk_id, "article_id": c.article_id} for c in answer.citations
         ],
         "invalid_citations": answer.invalid_citations,
+        "prompt_tokens": answer.prompt_tokens,
         # did the answer cite at least one gold article?
         "cites_gold": bool(cited & set(q.gold_article_ids)) if q.in_scope else None,
     }
@@ -240,6 +241,11 @@ def run_experiment(
     failed_rewrites = sum(r["rewrite_failed"] for r in rows)
     if failed_rewrites:
         not_reportable.append(f"query rewriting failed for {failed_rewrites} questions")
+    if generator is not None:
+        window = experiment.generation.num_ctx
+        full = sum(1 for r in rows if r["answer"] and (r["answer"]["prompt_tokens"] or 0) >= window)
+        if full:
+            not_reportable.append(f"{full} prompts filled the {window}-token window (cut)")
 
     timestamp = datetime.now(UTC)
     question_hash = hashlib.sha256(
@@ -332,6 +338,7 @@ def _ollama(model: str, gen: GenerationConfig) -> OllamaClient:
         model,
         seed=settings.random_seed,
         num_gpu=gen.gpu_layers,
+        num_ctx=gen.num_ctx,
         timeout_seconds=gen.timeout_seconds,
     )
     if not client.has_model():

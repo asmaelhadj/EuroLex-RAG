@@ -235,6 +235,8 @@ class GenerationConfig(_YamlModel):
     # refuse without calling the model when the top retrieval score is below this
     threshold: float | None = None
     gpu_layers: int | None = Field(default=None, ge=0)
+    # context window; prompts are ~2.4k-6.7k tokens with 8 articles + 3 recitals
+    num_ctx: int = Field(default=8192, gt=0)
     timeout_seconds: float = Field(default=300, gt=0)
 
 
