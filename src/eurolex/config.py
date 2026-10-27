@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     max_question_chars: int = Field(default=500, gt=0)
     random_seed: int = 42
 
+    # the API serves the config that was evaluated, so its answers match docs/results.md
+    api_config: Path = Path("configs/e7_threshold.yaml")
+    rate_limit_per_minute: int = Field(default=10, gt=0)
+    # where the UI finds the API
+    api_url: str = "http://localhost:8000"
+
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # Off by default: raw questions may contain personal data (SPEC.md section 9).
     log_queries: bool = False
