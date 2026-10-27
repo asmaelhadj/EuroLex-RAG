@@ -49,7 +49,7 @@ flowchart TB
         direction LR
         UI["User → Streamlit UI"] --> API["FastAPI"] --> SE["Search +<br/>evidence check"] --> LLM["Local LLM<br/>(Ollama)"] --> RESP["Answer with<br/>cited articles"]
     end
-    QD --> SE
+    OFF -- "articles and recitals<br/>with vectors" --> ON
 ```
 
 **1. Ingestion** (`make ingest`, run once)
