@@ -188,5 +188,7 @@ class Answer(_Frozen):
     # [n] markers that pointed at no passage; they are removed from `answer`
     invalid_citations: list[int] = Field(default_factory=list)
     passages: list[ScoredChunk] = Field(default_factory=list)
+    # prompt tokens the model actually read; equal to the window size means it was cut
+    prompt_tokens: int | None = None
     retrieval: RetrievalResult
     latency_ms: dict[str, float]

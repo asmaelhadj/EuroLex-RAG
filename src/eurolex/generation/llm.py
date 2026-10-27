@@ -37,6 +37,7 @@ class OllamaClient:
         temperature: float = 0.0,
         seed: int = 42,
         num_gpu: int | None = None,
+        num_ctx: int | None = None,
         client: httpx.Client | None = None,
     ) -> None:
         self.model = model
@@ -46,6 +47,12 @@ class OllamaClient:
         self._options: dict[str, float | int] = {"temperature": temperature, "seed": seed}
         if num_gpu is not None:
             self._options["num_gpu"] = num_gpu
+        # Ollama's default window is small and it silently drops the start of longer prompts
+        self.num_ctx = num_ctx
+        if num_ctx is not None:
+            self._options["num_ctx"] = num_ctx
+        # tokens Ollama actually read for the last prompt (prompt_eval_count)
+        self.last_prompt_tokens: int | None = None
         self._http = client or httpx.Client(timeout=timeout_seconds)
 
     def has_model(self) -> bool:
@@ -86,7 +93,9 @@ class OllamaClient:
             try:
                 response = self._http.post(self._url, json=body)
                 response.raise_for_status()
-                return str(response.json()["response"])
+                data = response.json()
+                self.last_prompt_tokens = data.get("prompt_eval_count")
+                return str(data["response"])
             except (httpx.HTTPError, KeyError, ValueError) as exc:
                 last_error = exc
                 logger.warning("ollama call failed (attempt %d): %s", attempt + 1, exc)

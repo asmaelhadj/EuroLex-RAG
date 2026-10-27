@@ -447,3 +447,43 @@ def test_answer_review_sample_and_summary(tmp_path: object) -> None:
     path.write_text(writer_bad, encoding="utf-8")
     with pytest.raises(ValueError, match="answer_correct"):
         summary(path)
+
+
+def test_run_is_not_reportable_when_a_prompt_fills_the_window() -> None:
+    from pathlib import Path
+
+    from eurolex.config import (
+        ExperimentConfig,
+        GenerationConfig,
+        RetrievalConfig,
+        RetrieverSpec,
+        load_ingest_config,
+    )
+    from eurolex.schemas import Question
+
+    class FullWindowLLM(ScriptedLLM):
+        last_prompt_tokens = 4096
+
+    q = Question(
+        id="q-0001",
+        question="When is processing lawful?",
+        gold_article_ids=["gdpr:art-6"],
+        type="factual",
+        source="faq",
+        status="validated",
+    )
+    pipeline = FakePipeline([scored(article("6", "x"))])
+    gen = AnswerGenerator(pipeline, FullWindowLLM("Rule [1]."))  # type: ignore[arg-type]
+    experiment = ExperimentConfig(
+        name="e7_generation",
+        description="d",
+        retrieval=RetrievalConfig(
+            collection="c", chunker="article", retrievers=[RetrieverSpec(type="dense")]
+        ),
+        generation=GenerationConfig(enabled=True, num_ctx=4096),
+    )
+    ingest = load_ingest_config(Path(__file__).parents[1] / "configs" / "ingest.yaml")
+    run = run_experiment(experiment, ingest, [q], "dev", pipeline, generator=gen)  # type: ignore[arg-type]
+    assert run["reportable"] is False
+    assert "1 prompts filled the 4096-token window (cut)" in run["not_reportable_because"]
+    assert run["questions"][0]["answer"]["prompt_tokens"] == 4096

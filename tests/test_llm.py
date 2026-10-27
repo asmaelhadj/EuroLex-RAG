@@ -143,3 +143,22 @@ def test_has_model_when_ollama_is_down() -> None:
 )
 def test_clean_rewrite(raw: str, expected: str) -> None:
     assert clean_rewrite(raw) == expected
+
+
+def test_num_ctx_and_prompt_tokens_are_recorded() -> None:
+    seen: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"response": "ok", "prompt_eval_count": 1234})
+
+    client = OllamaClient(
+        "http://o.test",
+        "m",
+        num_ctx=8192,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    assert client.last_prompt_tokens is None
+    client.generate("hi")
+    assert seen[0]["options"]["num_ctx"] == 8192  # type: ignore[index]
+    assert client.last_prompt_tokens == 1234
