@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # the API serves the config that was evaluated, so its answers match docs/results.md
     api_config: Path = Path("configs/e7_threshold.yaml")
     rate_limit_per_minute: int = Field(default=10, gt=0)
+    # the API waits less than evaluation does: a user should not sit behind a stuck answer.
+    # Longest answer on dev was about 500 tokens, so 1024 changes no evaluated answer.
+    api_max_answer_tokens: int = Field(default=1024, gt=0)
+    api_llm_timeout_seconds: float = Field(default=120, gt=0)
+    # optional Langfuse tracing; keys come from LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY
+    langfuse_enabled: bool = False
     # where the UI finds the API
     api_url: str = "http://localhost:8000"
 

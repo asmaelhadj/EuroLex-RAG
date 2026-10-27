@@ -1,6 +1,6 @@
 # ADR 002: Corpus source (CELLAR instead of the EUR-Lex HTML page)
 
-- Status: proposed (awaiting project-owner review)
+- Status: accepted (approved by the project owner in Phase 1)
 - Date: 2026-10-22
 
 ## Context

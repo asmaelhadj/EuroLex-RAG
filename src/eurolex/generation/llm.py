@@ -38,6 +38,7 @@ class OllamaClient:
         seed: int = 42,
         num_gpu: int | None = None,
         num_ctx: int | None = None,
+        num_predict: int | None = None,
         client: httpx.Client | None = None,
     ) -> None:
         self.model = model
@@ -51,6 +52,9 @@ class OllamaClient:
         self.num_ctx = num_ctx
         if num_ctx is not None:
             self._options["num_ctx"] = num_ctx
+        # cap on answer length, so a model that loops cannot hold the API for minutes
+        if num_predict is not None:
+            self._options["num_predict"] = num_predict
         # tokens Ollama actually read for the last prompt (prompt_eval_count)
         self.last_prompt_tokens: int | None = None
         self._http = client or httpx.Client(timeout=timeout_seconds)

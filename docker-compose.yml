@@ -20,6 +20,59 @@ services:
       retries: 10
       start_period: 10s
 
+  api:
+    build: .
+    image: eurolex-rag:local
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      # Ollama on the host by default; use http://ollama:11434 with the `ollama` profile
+      OLLAMA_BASE_URL: ${DOCKER_OLLAMA_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # BGE-M3 (about 2.3 GB) is downloaded here on first start
+      - hf_cache:/home/app/.cache/huggingface
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,json,sys; sys.exit(json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['status'] != 'ok')"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # the first start downloads the embedding model (2.3 GB)
+      start_period: 1800s
+
+  ui:
+    image: eurolex-rag:local
+    restart: unless-stopped
+    command:
+      - streamlit
+      - run
+      - src/eurolex/ui/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      - api
+
   # Optional: run Ollama in Docker instead of on the host.
   #   docker compose --profile ollama up -d ollama
   #   docker compose exec ollama ollama pull qwen2.5:7b-instruct
@@ -35,3 +88,4 @@ services:
 volumes:
   qdrant_storage:
   ollama_models:
+  hf_cache:

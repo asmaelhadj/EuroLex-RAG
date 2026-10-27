@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup check lint format typecheck test up down ingest eval report candidates review api ui
+.PHONY: help setup check lint format typecheck test up down qdrant ingest eval report candidates review api ui
 
 CONFIG ?= configs/e3_hybrid.yaml
 SPLIT ?= dev
@@ -27,7 +27,8 @@ typecheck:
 test:
 	uv run pytest --cov --cov-report=term-missing
 
-up: ## Start Qdrant (Docker for the API and UI comes in Phase 7; use `make api` and `make ui`)
+up: ## Start Qdrant, the API and the UI in Docker (Ollama runs on the host)
+	docker compose up -d --build
 	docker compose up -d --wait qdrant
 
 down: ## Stop services
@@ -48,8 +49,11 @@ candidates: ## Generate pending LLM question candidates (MODEL=mistral:latest)
 review: ## Review pending questions in the terminal
 	uv run python -m eurolex.evaluation.review_cli review
 
-api: ## Run the API on http://localhost:8000 (needs `make up`, Ollama and API_KEY in .env)
+qdrant: ## Start only Qdrant (enough for `make ingest`, `make eval`, `make api`)
+	docker compose up -d --wait qdrant
+
+api: ## Run the API locally on http://localhost:8000 (needs Qdrant, Ollama and API_KEY in .env)
 	uv run uvicorn --factory eurolex.api.main:app --host 127.0.0.1 --port 8000
 
-ui: ## Run the Streamlit UI on http://localhost:8501 (needs `make api`)
+ui: ## Run the UI locally on http://localhost:8501 (needs `make api`)
 	uv run streamlit run src/eurolex/ui/app.py --server.address 127.0.0.1
