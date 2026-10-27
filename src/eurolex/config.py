@@ -237,6 +237,8 @@ class GenerationConfig(_YamlModel):
     gpu_layers: int | None = Field(default=None, ge=0)
     # context window; prompts are ~2.4k-6.7k tokens with 8 articles + 3 recitals
     num_ctx: int = Field(default=8192, gt=0)
+    # reuse identical LLM calls from runs/llm_cache.jsonl (resume, and E7 with/without threshold)
+    cache: bool = True
     timeout_seconds: float = Field(default=300, gt=0)
 
 

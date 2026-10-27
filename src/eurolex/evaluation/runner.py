@@ -31,6 +31,7 @@ from eurolex.evaluation.judge import Judge
 from eurolex.evaluation.metrics import mean, ndcg_at_k, percentile, recall_at_k, reciprocal_rank
 from eurolex.evaluation.questions import QUESTIONS_PATH, load_questions
 from eurolex.generation.answer import AnswerGenerator
+from eurolex.generation.cache import CachedOllama
 from eurolex.generation.llm import OllamaClient
 from eurolex.retrieval.pipeline import RetrievalPipeline, build_pipeline
 from eurolex.schemas import Answer, Question, Split
@@ -331,7 +332,7 @@ def format_summary(results: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _ollama(model: str, gen: GenerationConfig) -> OllamaClient:
+def _ollama(model: str, gen: GenerationConfig) -> OllamaClient | CachedOllama:
     settings = get_settings()
     client = OllamaClient(
         settings.ollama_base_url,
@@ -343,6 +344,8 @@ def _ollama(model: str, gen: GenerationConfig) -> OllamaClient:
     )
     if not client.has_model():
         raise ConfigError(f"Ollama model {model} is not installed. Run `ollama pull {model}`.")
+    if gen.cache:
+        return CachedOllama(client, settings.runs_dir / "llm_cache.jsonl")
     return client
 
 
@@ -422,6 +425,12 @@ def main(argv: list[str] | None = None) -> int:
         judge=judge,
     )
     print(file=sys.stderr)
+    clients = [getattr(generator, "_llm", None), getattr(judge, "_llm", None)]
+    results["llm_cache"] = {
+        c.model: {"hits": c.hits, "misses": c.misses}
+        for c in clients
+        if isinstance(c, CachedOllama)
+    }
     run_dir = save_run(results, args.runs_dir or settings.runs_dir)
     print("\n".join(format_summary(results)))
     print(f"Saved to {run_dir}")

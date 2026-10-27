@@ -66,6 +66,12 @@ class OllamaClient:
         # "mistral" and "mistral:latest" are the same model
         return self.model in names or f"{self.model}:latest" in names
 
+    def options_for(self, temperature: float | None = None) -> dict[str, float | int]:
+        options = dict(self._options)
+        if temperature is not None:
+            options["temperature"] = temperature
+        return options
+
     def generate(
         self,
         prompt: str,
@@ -74,9 +80,7 @@ class OllamaClient:
         json_schema: dict[str, object] | None = None,
         temperature: float | None = None,
     ) -> str:
-        options = dict(self._options)
-        if temperature is not None:
-            options["temperature"] = temperature
+        options = self.options_for(temperature)
         body: dict[str, object] = {
             "model": self.model,
             "prompt": prompt,
