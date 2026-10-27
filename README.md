@@ -1,7 +1,6 @@
 # EuroLex-RAG
 
-<!-- TODO: replace OWNER/REPO once the repository is on GitHub -->
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/asmaelhadj/EuroLex-RAG/actions/workflows/ci.yml/badge.svg)](https://github.com/asmaelhadj/EuroLex-RAG/actions/workflows/ci.yml)
 
 A self-hosted assistant that answers questions about the GDPR from the official EU text, cites
 the articles it used, and says "I don't know" when the evidence is weak. Every design choice
@@ -99,7 +98,7 @@ Needs Python 3.11+, [uv](https://docs.astral.sh/uv/), Docker, GNU make and
 Windows). A GPU helps for ingestion and evaluation but is not required.
 
 ```bash
-git clone https://github.com/OWNER/REPO.git && cd REPO
+git clone https://github.com/asmaelhadj/EuroLex-RAG.git && cd EuroLex-RAG
 make setup                       # install locked dependencies and pre-commit hooks
 cp .env.example .env             # then set API_KEY, see below
 uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
