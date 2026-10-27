@@ -177,10 +177,6 @@ Each decision has an ADR in [docs/adr/](docs/adr/). The main ones:
 - GDPR only; the AI Act is planned (ADR 004).
 - Small question set: 60 in-scope dev and 13 in-scope test questions, so one question moves
   test recall by about 8 points. Most questions were drafted by an LLM, then reviewed.
-- Annotators: TODO (fill in).
-- Short, casual questions ("what is gdpr") can fall below the threshold and be refused; the
-  dev set has few such questions.
-- Answers can cite an irrelevant passage next to a correct one, or leave out exceptions.
 - On a 4 GB GPU an answer takes about 50 s (p50 generation time on dev), and the API answers
   one question at a time.
 - Information, not legal advice.
