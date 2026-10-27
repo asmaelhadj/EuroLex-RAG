@@ -24,6 +24,10 @@ status, never the question.
   source URL is per act, so the API adds the anchor; checked on the live EUR-Lex page
   (2026-10-27), which uses the same ids as the CELLAR copy we ingest.
 
+Two fields go beyond the SPEC contract, both added for the UI: `citations[].score` (the
+passage's retrieval similarity, shown as a badge and labelled as not a probability) and
+`passages` (how many passages the model was given).
+
 `POST /feedback` (a stretch goal) is not built.
 
 ## Security
@@ -43,9 +47,14 @@ status, never the question.
 ## UI
 
 Streamlit calls the API over HTTP with the key from `.env`, never the pipeline directly.
-The HTTP part (`ui/client.py`) is separate from the page so it can be tested. The page shows
-a not-legal-advice banner, the answer with `[n]` markers, one expander per citation with the
-exact text and the EUR-Lex link, and a separate look for refusals.
+The HTTP part (`ui/client.py`) and the HTML helpers (`ui/render.py`) are separate from the
+page so they can be tested. Layout: sidebar with the corpus and example questions, header
+with an API status pill and the not-legal-advice banner, chat cards with `[n]` badges and a
+stats row, and a sources panel with the exact text and EUR-Lex link per citation. Refusals
+and errors have their own look. Model output is HTML-escaped before it is shown, and
+markdown images are dropped, so an answer cannot inject tags or load outside URLs. Custom
+CSS on top of Streamlit, not a separate frontend, so the stack stays Python-only. The chat
+history is kept only in the browser session.
 
 ## Tests
 

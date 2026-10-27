@@ -46,6 +46,8 @@ class CitationOut(BaseModel):
     article_title: str
     text: str
     url: str
+    # retrieval similarity of this passage (not a probability that the answer is right)
+    score: float
 
 
 class Latency(BaseModel):
@@ -59,6 +61,8 @@ class AskResponse(BaseModel):
     refused: bool
     citations: list[CitationOut]
     latency_ms: Latency
+    # how many passages the model was given
+    passages: int
 
 
 class Health(BaseModel):
@@ -91,6 +95,7 @@ def to_response(answer: Answer) -> AskResponse:
                 article_title=c.article_title or (f"Recital {recital}" if recital else ""),
                 text=c.text,
                 url=deep_link(c.url, chunk),
+                score=round(answer.passages[c.n - 1].score, 3),
             )
         )
     lat = answer.latency_ms
@@ -103,6 +108,7 @@ def to_response(answer: Answer) -> AskResponse:
             rerank=round(answer.retrieval.latency_ms.get("rerank", 0)),
             generation=round(lat.get("generation", 0)),
         ),
+        passages=len(answer.passages),
     )
 
 
